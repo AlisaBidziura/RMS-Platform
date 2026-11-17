@@ -1,26 +1,36 @@
 import asyncio
 import random
+import re
 from contextlib import asynccontextmanager, suppress
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import (
+    FastAPI,
+    Depends,
+    HTTPException,
+    Header,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import desc, func, select
+
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import (
-    AsyncSession,
-    async_sessionmaker,
     create_async_engine,
+    async_sessionmaker,
+    AsyncSession,
 )
 
-from models import Base, Event, Robot, Task, utcnow
+from models import Base, User, Robot, Task, Event
 from schemas import (
-    EventResponse,
     LoginRequest,
     LoginResponse,
     RobotResponse,
     TaskCreate,
-    TaskResponse,
     TaskStatusUpdate,
+    TaskResponse,
+    EventResponse,
 )
 
 DATABASE_URL = "sqlite+aiosqlite:///./rms.db"
@@ -30,252 +40,585 @@ engine = create_async_engine(
     echo=False,
     connect_args={"check_same_thread": False},
 )
-SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
-ROBOT_STATUSES = {"working", "available", "charging", "warning", "offline"}
-TASK_STATUSES = {"Ожидает", "В работе", "Требует внимания", "Завершена", "Отменена"}
+SessionLocal = async_sessionmaker(
+    bind=engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
+
+FAKE_TOKEN = "fake-token"
+
+ROBOT_STATUSES = {
+    "working",
+    "available",
+    "charging",
+    "warning",
+    "offline",
+}
+
+TASK_STATUSES = {
+    "Ожидает",
+    "В работе",
+    "Требует внимания",
+    "Завершена",
+    "Отменена",
+}
+
+
+def current_time():
+    return datetime.now()
+
+
+def format_time():
+    return current_time().strftime("%H:%M")
+
+
+def format_event_time():
+    return current_time().strftime("%H:%M:%S")
 
 
 async def get_db():
-    async with SessionLocal() as session:
-        yield session
+    async with SessionLocal() as db:
+        yield db
 
 
-def clock_time() -> str:
-    return datetime.now().strftime("%H:%M")
+
+async def require_auth(
+    authorization: str | None = Header(default=None),
+):
+    if authorization != f"Bearer {FAKE_TOKEN}":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return True
 
 
-def event_time() -> str:
-    return datetime.now().strftime("%H:%M:%S")
+class ConnectionManager:
+
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        print(
+            f"[WS] Client connected. "
+            f"Total: {len(self.active_connections)}"
+        )
+
+    def disconnect(self, websocket: WebSocket):
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+
+        print(
+            f"[WS] Client disconnected. "
+            f"Total: {len(self.active_connections)}"
+        )
+
+    async def broadcast(self, message: dict):
+        disconnected = []
+
+        for connection in self.active_connections.copy():
+            try:
+                await connection.send_json(message)
+            except Exception:
+                disconnected.append(connection)
+
+        for connection in disconnected:
+            self.disconnect(connection)
 
 
-async def add_event(
-    db: AsyncSession, title: str, detail: str, tone: str = "info"
-) -> None:
-    db.add(Event(time=event_time(), title=title, detail=detail, tone=tone))
-    # Keep the audit feed bounded.
+manager = ConnectionManager()
+
+
+async def create_event(
+    db: AsyncSession,
+    title: str,
+    detail: str,
+    tone: str = "info",
+):
+    event = Event(
+        time=format_event_time(),
+        title=title,
+        detail=detail,
+        tone=tone,
+    )
+
+    db.add(event)
     await db.flush()
 
+    return event
 
-async def seed_database() -> None:
+
+def robot_to_dict(robot: Robot):
+    return {
+        "id": robot.id,
+        "name": robot.name,
+        "type": robot.type,
+        "model": robot.model,
+        "battery": robot.battery,
+        "status": robot.status,
+        "floor": robot.floor,
+        "task": robot.task,
+    }
+
+
+def task_to_dict(task: Task):
+    return {
+        "id": task.id,
+        "title": task.title,
+        "kind": task.kind,
+        "robotId": task.robot_id,
+        "zone": task.zone,
+        "status": task.status,
+        "priority": task.priority,
+        "time": task.time,
+    }
+
+
+async def initialize_database():
+
     async with SessionLocal() as db:
-        count = await db.scalar(select(func.count()).select_from(Robot))
-        if count:
+
+        result = await db.execute(select(Robot.id))
+        existing_robots = result.scalars().all()
+
+        if existing_robots:
             return
+
+        now = current_time()
 
         robots = [
             Robot(
-                id="R-001", name="TransportBot-01", type="Транспортный",
-                model="TB-200", battery=82, status="working", floor=2,
+                id="R-001",
+                name="TransportBot-01",
+                type="Транспортный",
+                model="TB-200",
+                battery=82,
+                status="working",
+                floor=2,
                 task="Доставка расходных материалов",
             ),
             Robot(
-                id="R-002", name="CleanBot-02", type="Уборочный",
-                model="CB-100", battery=64, status="warning", floor=1,
+                id="R-002",
+                name="CleanBot-02",
+                type="Уборочный",
+                model="CB-100",
+                battery=64,
+                status="warning",
+                floor=1,
                 task=None,
             ),
             Robot(
-                id="R-003", name="TransportBot-03", type="Транспортный",
-                model="TB-200", battery=96, status="available", floor=3,
+                id="R-003",
+                name="TransportBot-03",
+                type="Транспортный",
+                model="TB-200",
+                battery=96,
+                status="available",
+                floor=3,
+                task=None,
+            ),
+            Robot(
+                id="R-004",
+                name="DeliveryBot-04",
+                type="Доставочный",
+                model="DB-300",
+                battery=45,
+                status="available",
+                floor=2,
+                task=None,
+            ),
+            Robot(
+                id="R-005",
+                name="CleanBot-05",
+                type="Уборочный",
+                model="CB-100",
+                battery=91,
+                status="charging",
+                floor=1,
                 task=None,
             ),
         ]
+
         db.add_all(robots)
 
-        now = utcnow()
-        db.add(
-            Task(
-                id="T-104",
-                title="Доставка расходных материалов",
-                kind="Доставка",
-                robot_id="R-001",
-                zone="Этаж 2 · Склад → Кабинет 204",
-                status="В работе",
-                priority="Высокий",
-                time=clock_time(),
-                created_at=now - timedelta(minutes=8),
-                started_at=now - timedelta(minutes=7),
-            )
+        initial_task = Task(
+            id="T-104",
+            title="Доставка расходных материалов",
+            kind="Доставка",
+            robot_id="R-001",
+            zone="Этаж 2 · Склад → Кабинет 204",
+            status="В работе",
+            priority="Высокий",
+            time=format_time(),
+            created_at=now,
+            started_at=now,
         )
-        db.add(
-            Event(
-                time=event_time(),
-                title="CleanBot-02 требует внимания",
-                detail="Проверка оборудования",
-                tone="warning",
-                created_at=now,
-            )
+
+        db.add(initial_task)
+
+        await create_event(
+            db,
+            "Система RMS запущена",
+            "Все подсистемы работают в штатном режиме",
+            "success",
         )
+
+        await create_event(
+            db,
+            "CleanBot-02 требует внимания",
+            "Проверка оборудования",
+            "warning",
+        )
+
         await db.commit()
 
+        print("[DB] Initial data created")
 
-async def simulator_loop() -> None:
-    """Check task timers every second and drain one random battery every 10 seconds."""
-    battery_tick = 0
+async def simulator_loop():
+
+    tick = 0
+
+    print("[SIMULATOR] Started")
+
     while True:
+
         try:
+
             async with SessionLocal() as db:
-                # A task starts 5 seconds after creation, then runs for 20 seconds.
-                now = utcnow()
-                waiting = (
-                    await db.scalars(
-                        select(Task).where(Task.status == "Ожидает")
-                    )
-                ).all()
 
-                for task in waiting:
-                    if now - task.created_at >= timedelta(seconds=5):
-                        task.status = "В работе"
-                        task.started_at = now
-                        robot = await db.get(Robot, task.robot_id)
-                        if robot:
-                            robot.status = "working"
-                            robot.task = task.title
-                        await add_event(
-                            db,
-                            f"Задача {task.id} запущена",
-                            f"{task.title} · робот {task.robot_id}",
-                            "info",
-                        )
+                now = current_time()
 
-                running = (
+                # 1. TASK START
+
+                waiting_tasks = (
                     await db.scalars(
                         select(Task).where(
-                            Task.status == "В работе",
-                            Task.started_at.is_not(None),
+                            Task.status == "Ожидает"
                         )
                     )
                 ).all()
 
-                for task in running:
-                    if task.started_at and now - task.started_at >= timedelta(seconds=20):
-                        task.status = "Завершена"
-                        robot = await db.get(Robot, task.robot_id)
-                        if robot:
-                            robot.status = "available"
-                            robot.task = None
-                        await add_event(
-                            db,
-                            f"Задача {task.id} завершена",
-                            f"{task.title} · робот {task.robot_id}",
-                            "success",
+                for task in waiting_tasks:
+
+                    if now - task.created_at < timedelta_seconds(10):
+                        continue
+
+                    robot = await db.get(Robot, task.robot_id)
+
+                    if not robot or robot.status != "available":
+                        continue
+
+                    task.status = "В работе"
+                    task.started_at = now
+
+                    robot.status = "working"
+                    robot.task = task.title
+
+                    await create_event(
+                        db,
+                        f"Задача {task.id} запущена",
+                        f"{task.title} · робот {robot.name}",
+                        "info",
+                    )
+
+                    print(f"[SIMULATOR] Task {task.id}: started")
+
+                # 2. TASK COMPLETION
+
+                running_tasks = (
+                    await db.scalars(
+                        select(Task).where(
+                            Task.status == "В работе"
+                        )
+                    )
+                ).all()
+
+                for task in running_tasks:
+
+                    if task.started_at is None:
+                        continue
+
+                    if now - task.started_at < timedelta_seconds(20):
+                        continue
+
+                    robot = await db.get(Robot, task.robot_id)
+
+                    # Do not complete a task while its robot is charging.
+                    if not robot or robot.status != "working":
+                        continue
+
+                    task.status = "Завершена"
+
+                    robot.status = "available"
+                    robot.task = None
+
+                    await create_event(
+                        db,
+                        f"Задача {task.id} завершена",
+                        f"{task.title} · робот {robot.name}",
+                        "success",
+                    )
+
+                    print(f"[SIMULATOR] Task {task.id}: completed")
+
+                # 3. BATTERY MANAGEMENT
+                # Every 10 seconds
+
+                if tick > 0 and tick % 10 == 0:
+
+                    robots = (
+                        await db.scalars(select(Robot))
+                    ).all()
+
+                    for robot in robots:
+
+                        # WORKING: battery decreases by 1%
+                        if robot.status == "working":
+
+                            robot.battery = max(
+                                0,
+                                robot.battery - 1,
+                            )
+
+                            if robot.battery < 20:
+
+                                robot.status = "charging"
+
+                                await create_event(
+                                    db,
+                                    f"{robot.name} отправлен на зарядку",
+                                    f"Заряд батареи: {robot.battery}%",
+                                    "warning",
+                                )
+
+                                # Pause the current task.
+                                active_tasks = (
+                                    await db.scalars(
+                                        select(Task).where(
+                                            Task.robot_id == robot.id,
+                                            Task.status == "В работе",
+                                        )
+                                    )
+                                ).all()
+
+                                for task in active_tasks:
+                                    task.status = "Требует внимания"
+
+                        # CHARGING: battery increases by 2%
+                        elif robot.status == "charging":
+
+                            robot.battery = min(
+                                100,
+                                robot.battery + 2,
+                            )
+
+                            if robot.battery >= 100:
+
+                                robot.battery = 100
+                                robot.status = "available"
+                                robot.task = None
+
+                                await create_event(
+                                    db,
+                                    f"{robot.name} полностью заряжен",
+                                    "Робот готов к новым задачам",
+                                    "success",
+                                )
+
+                        # Battery is never allowed outside 0..100.
+                        robot.battery = max(
+                            0,
+                            min(100, robot.battery),
                         )
 
                 await db.commit()
 
-            battery_tick += 1
-            if battery_tick >= 10:
-                battery_tick = 0
-                async with SessionLocal() as db:
+                # 4. WEBSOCKET BROADCAST
+                # Every 2 seconds
+
+                if tick % 2 == 0:
+
                     robots = (
                         await db.scalars(
-                            select(Robot).where(Robot.status != "offline")
+                            select(Robot).order_by(Robot.id)
                         )
                     ).all()
-                    if robots:
-                        robot = random.choice(robots)
-                        robot.battery = max(0, robot.battery - 1)
-                        if robot.battery == 0:
-                            robot.status = "offline"
-                            robot.task = None
-                            await add_event(
-                                db,
-                                f"{robot.name} отключён",
-                                "Уровень заряда достиг 0%",
-                                "warning",
-                            )
-                        await db.commit()
 
+                    tasks = (
+                        await db.scalars(
+                            select(Task).order_by(Task.created_at.desc())
+                        )
+                    ).all()
+
+                    message = {
+                        "type": "update",
+                        "robots": [
+                            robot_to_dict(robot)
+                            for robot in robots
+                        ],
+                        "tasks": [
+                            task_to_dict(task)
+                            for task in tasks
+                        ],
+                    }
+
+                    await manager.broadcast(message)
+
+            tick += 1
             await asyncio.sleep(1)
 
         except asyncio.CancelledError:
+            print("[SIMULATOR] Stopped")
             raise
-        except Exception as exc:
-            # Keep the simulator alive if one iteration fails.
-            print(f"[simulator] Ошибка цикла: {exc}")
+
+        except Exception as error:
+            print(f"[SIMULATOR ERROR] {error}")
             await asyncio.sleep(2)
 
 
+def timedelta_seconds(seconds: int):
+    from datetime import timedelta
+    return timedelta(seconds=seconds)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+
+    print("[RMS] Starting application...")
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    await seed_database()
+
+    await initialize_database()
+
     simulator_task = asyncio.create_task(simulator_loop())
+
     yield
+
     simulator_task.cancel()
+
     with suppress(asyncio.CancelledError):
         await simulator_task
+
     await engine.dispose()
+
+    print("[RMS] Application stopped")
 
 
 app = FastAPI(
-    title="Robot Management System API",
-    description="MVP API для управления парком роботов и задачами.",
-    version="1.0.0",
+    title="RMS - Robot Management System",
+    description="API для управления парком автономных роботов",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
+
+ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-
 @app.get("/")
 async def root():
-    return {"message": "Robot Management System API", "docs": "/docs"}
 
+    return {
+        "name": "Robot Management System",
+        "status": "online",
+        "version": "2.0.0",
+        "docs": "/docs",
+        "websocket": "/ws",
+    }
 
-@app.post("/api/login", response_model=LoginResponse)
-async def login(payload: LoginRequest):
-    # Demo authentication only. Replace with password verification and JWT in production.
-    if not payload.login.strip() or not payload.password.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Логин и пароль не должны быть пустыми",
+@app.post(
+    "/api/login",
+    response_model=LoginResponse,
+)
+async def login(
+    payload: LoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+
+    # Demo login: any non-empty credentials are accepted.
+    user = await db.scalar(
+        select(User).where(User.username == "dispatcher")
+    )
+
+    if not user:
+        user = User(
+            username="dispatcher",
+            role="Диспетчер",
         )
+        db.add(user)
+        await db.commit()
+
     return {
         "user": "dispatcher",
         "role": "Диспетчер",
-        "token": "fake-jwt-token",
+        "token": FAKE_TOKEN,
     }
 
 
-@app.get("/api/robots", response_model=list[RobotResponse])
-async def get_robots(db: AsyncSession = Depends(get_db)):
-    result = await db.scalars(select(Robot).order_by(Robot.id))
+@app.get(
+    "/api/robots",
+    response_model=list[RobotResponse],
+)
+async def get_robots(
+    db: AsyncSession = Depends(get_db),
+):
+
+    result = await db.scalars(
+        select(Robot).order_by(Robot.id)
+    )
+
     return result.all()
 
 
-@app.get("/api/robots/{robot_id}", response_model=RobotResponse)
-async def get_robot(robot_id: str, db: AsyncSession = Depends(get_db)):
+@app.get(
+    "/api/robots/{robot_id}",
+    response_model=RobotResponse,
+)
+async def get_robot(
+    robot_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+
     robot = await db.get(Robot, robot_id)
+
     if not robot:
-        raise HTTPException(status_code=404, detail="Робот не найден")
+        raise HTTPException(
+            status_code=404,
+            detail="Робот не найден",
+        )
+
     return robot
 
+@app.get(
+    "/api/tasks",
+    response_model=list[TaskResponse],
+)
+async def get_tasks(
+    db: AsyncSession = Depends(get_db),
+):
 
-@app.get("/api/tasks", response_model=list[TaskResponse])
-async def get_tasks(db: AsyncSession = Depends(get_db)):
-    result = await db.scalars(select(Task).order_by(desc(Task.created_at)))
+    result = await db.scalars(
+        select(Task).order_by(Task.created_at.desc())
+    )
+
     return [
-        {
-            "id": task.id,
-            "title": task.title,
-            "kind": task.kind,
-            "robotId": task.robot_id,
-            "zone": task.zone,
-            "status": task.status,
-            "priority": task.priority,
-            "time": task.time,
-        }
+        task_to_dict(task)
         for task in result.all()
     ]
 
@@ -283,17 +626,55 @@ async def get_tasks(db: AsyncSession = Depends(get_db)):
 @app.post(
     "/api/tasks",
     response_model=TaskResponse,
-    status_code=status.HTTP_201_CREATED,
+    status_code=201,
+    dependencies=[Depends(require_auth)],
 )
-async def create_task(payload: TaskCreate, db: AsyncSession = Depends(get_db)):
-    robot = await db.get(Robot, payload.robotId)
-    if not robot:
-        raise HTTPException(status_code=404, detail="Робот не найден")
+async def create_task(
+    payload: TaskCreate,
+    db: AsyncSession = Depends(get_db),
+):
 
-    existing_ids = (await db.scalars(select(Task.id))).all()
-    numeric_ids = [int(value[2:]) for value in existing_ids if value.startswith("T-") and value[2:].isdigit()]
-    # IDs follow the same human-readable pattern as the frontend mock data.
-    next_number = max([104, *numeric_ids]) + 1
+    robot = await db.get(Robot, payload.robotId)
+
+    if not robot:
+        raise HTTPException(
+            status_code=404,
+            detail="Робот не найден",
+        )
+
+    if robot.status != "available":
+        raise HTTPException(
+            status_code=409,
+            detail="Робот сейчас недоступен для новой задачи",
+        )
+
+    # Prevent assigning multiple active tasks to one robot.
+    existing_task = await db.scalar(
+        select(Task).where(
+            Task.robot_id == robot.id,
+            Task.status.in_(["Ожидает", "В работе", "Требует внимания"]),
+        )
+    )
+
+    if existing_task:
+        raise HTTPException(
+            status_code=409,
+            detail="У робота уже есть активная задача",
+        )
+
+    # Generate IDs: T-108, T-109, T-110...
+    existing_ids = (
+        await db.scalars(select(Task.id))
+    ).all()
+
+    numbers = [
+        int(match.group(1))
+        for task_id in existing_ids
+        if (match := re.fullmatch(r"T-(\d+)", task_id))
+    ]
+
+    next_number = max([107, *numbers]) + 1
+
     task = Task(
         id=f"T-{next_number}",
         title=payload.title,
@@ -301,95 +682,190 @@ async def create_task(payload: TaskCreate, db: AsyncSession = Depends(get_db)):
         robot_id=payload.robotId,
         zone=payload.zone,
         status="Ожидает",
-        priority=payload.priority,
-        time=clock_time(),
-        created_at=utcnow(),
+        priority="Обычный",
+        time=format_time(),
+        created_at=current_time(),
+        started_at=None,
     )
+
     db.add(task)
-    await add_event(
+
+    await create_event(
         db,
         "Создана новая задача",
-        f"{task.title} · робот {task.robot_id}",
+        f"{task.title} · назначен робот {robot.name}",
         "info",
     )
+
     await db.commit()
-    return {
-        "id": task.id,
-        "title": task.title,
-        "kind": task.kind,
-        "robotId": task.robot_id,
-        "zone": task.zone,
-        "status": task.status,
-        "priority": task.priority,
-        "time": task.time,
-    }
+
+    return task_to_dict(task)
 
 
-@app.patch("/api/tasks/{task_id}", response_model=TaskResponse)
-async def update_task_status(
+@app.patch(
+    "/api/tasks/{task_id}",
+    response_model=TaskResponse,
+    dependencies=[Depends(require_auth)],
+)
+async def update_task(
     task_id: str,
     payload: TaskStatusUpdate,
     db: AsyncSession = Depends(get_db),
 ):
+
     if payload.status not in TASK_STATUSES:
         raise HTTPException(
             status_code=422,
-            detail=f"Недопустимый статус. Допустимые значения: {sorted(TASK_STATUSES)}",
+            detail="Недопустимый статус задачи",
         )
 
     task = await db.get(Task, task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Задача не найдена")
 
-    previous_status = task.status
-    task.status = payload.status
+    if not task:
+        raise HTTPException(
+            status_code=404,
+            detail="Задача не найдена",
+        )
+
+    old_status = task.status
+    new_status = payload.status
+
+    if old_status == new_status:
+        return task_to_dict(task)
+
+    task.status = new_status
+
     robot = await db.get(Robot, task.robot_id)
 
     if robot:
-        if payload.status == "В работе":
+
+        if new_status == "В работе":
+
+            if robot.status != "available":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Робот недоступен",
+                )
+
             robot.status = "working"
             robot.task = task.title
-            task.started_at = utcnow()
-        elif payload.status in {"Завершена", "Отменена"}:
-            robot.status = "available"
-            robot.task = None
-        elif payload.status == "Ожидает":
+            task.started_at = current_time()
+
+        elif new_status == "Ожидает":
+
             task.started_at = None
 
-    if previous_status != payload.status:
-        tone = "success" if payload.status == "Завершена" else "info"
-        await add_event(
-            db,
-            f"Изменён статус задачи {task.id}",
-            f"{previous_status} → {payload.status}",
-            tone,
-        )
+            if robot.status == "working":
+                robot.status = "available"
+                robot.task = None
+
+        elif new_status in {"Завершена", "Отменена"}:
+
+            if robot.status == "working":
+                robot.status = "available"
+                robot.task = None
+
+        elif new_status == "Требует внимания":
+
+            robot.status = "warning"
+
+    tone = (
+        "success" if new_status == "Завершена"
+        else "warning" if new_status == "Требует внимания"
+        else "info"
+    )
+
+    await create_event(
+        db,
+        f"Изменён статус задачи {task.id}",
+        f"{old_status} → {new_status}",
+        tone,
+    )
 
     await db.commit()
+
+    return task_to_dict(task)
+
+@app.get(
+    "/api/events",
+    response_model=list[EventResponse],
+)
+async def get_events(
+    db: AsyncSession = Depends(get_db),
+):
+
+    result = await db.scalars(
+        select(Event).order_by(
+            Event.id.desc()
+        ).limit(100)
+    )
+
+    return result.all()
+
+
+@app.post("/api/admin/reset")
+async def reset_system(
+    db: AsyncSession = Depends(get_db),
+):
+
+    # Remove all tasks.
+    await db.execute(delete(Task))
+
+    # Reset every robot.
+    robots = (
+        await db.scalars(select(Robot))
+    ).all()
+
+    for robot in robots:
+        robot.battery = 100
+        robot.status = "available"
+        robot.task = None
+
+    await create_event(
+        db,
+        "Система сброшена",
+        "Все роботы восстановлены, список задач очищен",
+        "info",
+    )
+
+    await db.commit()
+
     return {
-        "id": task.id,
-        "title": task.title,
-        "kind": task.kind,
-        "robotId": task.robot_id,
-        "zone": task.zone,
-        "status": task.status,
-        "priority": task.priority,
-        "time": task.time,
+        "success": True,
+        "message": "Система успешно сброшена",
+        "robots_reset": len(robots),
+        "tasks_deleted": True,
     }
 
 
-@app.get("/api/events", response_model=list[EventResponse])
-async def get_events(db: AsyncSession = Depends(get_db)):
-    result = await db.scalars(
-        select(Event).order_by(desc(Event.created_at), desc(Event.id)).limit(50)
-    )
-    # Frontend contract intentionally exposes only these four fields.
-    return [
-        {
-            "time": event.time,
-            "title": event.title,
-            "detail": event.detail,
-            "tone": event.tone,
-        }
-        for event in result.all()
-    ]
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+
+    origin = websocket.headers.get("origin")
+
+    if origin and origin not in ALLOWED_ORIGINS:
+        await websocket.close(code=1008)
+        return
+
+    await manager.connect(websocket)
+
+    try:
+
+        while True:
+            # Keep connection alive and detect client disconnects.
+            await websocket.receive_text()
+
+    except WebSocketDisconnect:
+
+        manager.disconnect(websocket)
+
+
+@app.get("/api/health")
+async def health_check():
+
+    return {
+        "status": "healthy",
+        "database": "connected",
+        "simulator": "running",
+        "websocket": "enabled",
+    }

@@ -12,9 +12,15 @@ class LoginResponse(BaseModel):
     token: str
 
 
-class RobotResponse(BaseModel):
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    role: str
+
     model_config = ConfigDict(from_attributes=True)
 
+
+class RobotResponse(BaseModel):
     id: str
     name: str
     type: str
@@ -24,13 +30,14 @@ class RobotResponse(BaseModel):
     floor: int
     task: str | None
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 class TaskCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
-    kind: str = Field(min_length=1, max_length=80)
+    kind: str = Field(min_length=1, max_length=100)
     robotId: str = Field(min_length=1)
     zone: str = Field(min_length=1, max_length=255)
-    priority: str = "Средний"
 
 
 class TaskStatusUpdate(BaseModel):
@@ -49,7 +56,14 @@ class TaskResponse(BaseModel):
 
 
 class EventResponse(BaseModel):
+    id: int
     time: str
     title: str
     detail: str
     tone: str
+
+
+class RealtimeUpdate(BaseModel):
+    type: str = "update"
+    robots: list[RobotResponse]
+    tasks: list[TaskResponse]
