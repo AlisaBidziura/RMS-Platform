@@ -54,15 +54,24 @@ function App() {
       .catch(err => console.error("Ошибка загрузки задач:", err));
   }, []);
 
-  // дополнительно
-useEffect(() => {
-  // Каждые 5 секунд обновляем данные с сервера
-  const interval = setInterval(() => {
-    fetch('http://localhost:8000/api/robots').then(r => r.json()).then(setRobots);
-    fetch('http://localhost:8000/api/tasks').then(r => r.json()).then(setTasks);
-  }, 5000);
   
-  return () => clearInterval(interval); // Очистка при закрытии
+  useEffect(() => {
+    // Первичная загрузка данных
+    fetch('http://127.0.0.1:8000/api/robots').then(res => res.json()).then(data => setRobots(data)).catch(console.error);
+    fetch('http://127.0.0.1:8000/api/tasks').then(res => res.json()).then(data => setTasks(data)).catch(console.error);
+
+    // WebSocket
+    const ws = new WebSocket('ws://127.0.0.1:8000/ws');
+    
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      if (data.type === 'update') {
+        setRobots(data.robots);
+        setTasks(data.tasks);
+      }
+    };
+
+  return () => ws.close();
 }, []);
 
   const [query, setQuery] = useState('')
