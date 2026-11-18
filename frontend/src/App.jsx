@@ -174,7 +174,10 @@ function TasksPage({ tasks, setTasks, robots, notify }) { const [showForm, setSh
     try {
         const response = await fetch('http://localhost:8000/api/tasks', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
             body: JSON.stringify({ title: title.trim(), kind, robotId, zone })
         });
         const createdTask = await response.json();
@@ -194,7 +197,10 @@ function TasksPage({ tasks, setTasks, robots, notify }) { const [showForm, setSh
     try {
         const response = await fetch(`http://localhost:8000/api/tasks/${t.id}`, {
             method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
             body: JSON.stringify({ status: next })
         });
         if (response.ok) {
