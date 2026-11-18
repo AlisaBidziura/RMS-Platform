@@ -77,7 +77,23 @@ useEffect(() => {
   const logout = () => { localStorage.removeItem('rms-demo-login'); setLoggedIn(false); navigate('/login') }
   if (!loggedIn && location.pathname !== '/login') return <Navigate to="/login" replace />
   if (loggedIn && location.pathname === '/login') return <Navigate to="/dashboard" replace />
-  if (!loggedIn) return <LoginPage onLogin={(name) => { localStorage.setItem('rms-demo-login', 'yes'); localStorage.setItem('rms-demo-user', name); setLoggedIn(true); navigate('/dashboard') }} />
+  if (!loggedIn) return 
+  // <LoginPage onLogin={(name) => { localStorage.setItem('rms-demo-login', 'yes'); localStorage.setItem('rms-demo-user', name); setLoggedIn(true); navigate('/dashboard') }} />
+  <LoginPage onLogin={async (name) => { 
+    try {
+      const res = await fetch('http://127.0.0.1:8000/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login: name, password: '12345' })
+      });
+      const data = await res.json();
+      localStorage.setItem('token', data.token);
+    } catch(e) { console.log('Ошибка логина', e); }
+    localStorage.setItem('rms-demo-login','yes'); 
+    localStorage.setItem('rms-demo-user', name); 
+    setLoggedIn(true); 
+    navigate('/dashboard'); 
+  }} />
   return <div className="app-shell">
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark"><Bot size={22} /></div><div><b>rms<span>.</span></b><small>ROBOT MANAGEMENT</small></div></div>
