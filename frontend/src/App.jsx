@@ -40,19 +40,19 @@ function App() {
   const [robots, setRobots] = useState([])
   const [tasks, setTasks] = useState([])
 
-  useEffect(() => {
-    // Загружаем роботов
-    fetch('http://localhost:8000/api/robots')
-      .then(res => res.json())
-      .then(data => setRobots(data))
-      .catch(err => console.error("Ошибка загрузки роботов:", err));
+  // useEffect(() => {
+  //   // Загружаем роботов
+  //   fetch('http://localhost:8000/api/robots')
+  //     .then(res => res.json())
+  //     .then(data => setRobots(data))
+  //     .catch(err => console.error("Ошибка загрузки роботов:", err));
 
-    // Загружаем задачи
-    fetch('http://localhost:8000/api/tasks')
-      .then(res => res.json())
-      .then(data => setTasks(data))
-      .catch(err => console.error("Ошибка загрузки задач:", err));
-  }, []);
+  //   // Загружаем задачи
+  //   fetch('http://localhost:8000/api/tasks')
+  //     .then(res => res.json())
+  //     .then(data => setTasks(data))
+  //     .catch(err => console.error("Ошибка загрузки задач:", err));
+  // }, []);
 
   
   useEffect(() => {
@@ -86,9 +86,7 @@ function App() {
   const logout = () => { localStorage.removeItem('rms-demo-login'); setLoggedIn(false); navigate('/login') }
   if (!loggedIn && location.pathname !== '/login') return <Navigate to="/login" replace />
   if (loggedIn && location.pathname === '/login') return <Navigate to="/dashboard" replace />
-  if (!loggedIn) return 
-  // <LoginPage onLogin={(name) => { localStorage.setItem('rms-demo-login', 'yes'); localStorage.setItem('rms-demo-user', name); setLoggedIn(true); navigate('/dashboard') }} />
-  <LoginPage onLogin={async (name) => { 
+  if (!loggedIn) return <LoginPage onLogin={async (name) => { 
     try {
       const res = await fetch('http://127.0.0.1:8000/api/login', {
         method: 'POST',
@@ -163,23 +161,44 @@ function RobotsPage({ robots, query, setQuery, notify }) {
 }
 function RobotCard({ robot: r }) { const navigate = useNavigate(); return <div className="robot-card"><div className="robot-card-top"><div className="robot-large-icon"><Bot size={27} /></div><Badge tone={statusClass[r.status]} dot>{statusNames[r.status]}</Badge><button className="icon-button" onClick={() => navigate(`/robots/${r.id}`)}><ArrowUpRight size={17} /></button></div><h3>{r.name}</h3><p>{r.id} · {r.model}</p><div className="robot-card-type">{r.type}<span>Этаж {r.floor}</span></div><div className="robot-battery"><div className="battery-label"><span>Уровень заряда</span><b>{r.battery}%</b></div><div className="progress"><span style={{ width: `${r.battery}%` }} className={r.battery < 25 ? 'low' : ''} /></div></div><div className="robot-current-task"><small>Текущая активность</small><b>{r.task}</b></div><NavLink className="card-link" to={`/robots/${r.id}`}>Открыть карточку <ArrowUpRight size={15} /></NavLink></div> }
 function RobotDetail({ robots, tasks, notify }) { const { id } = useLocation().pathname.match(/\/robots\/([^/]+)/)?.[1] ? { id: useLocation().pathname.match(/\/robots\/([^/]+)/)[1] } : { id: '' }; const r = robots.find(x => x.id === id); if (!r) return <EmptyState title="Робот не найден" text="Вернитесь в каталог и выберите устройство." />; return <><PageHeading eyebrow={`РОБОТ ${r.id}`} title={r.name} description={`${r.type} · ${r.model}`} action={<Badge tone={statusClass[r.status]} dot>{statusNames[r.status]}</Badge>} /><div className="detail-grid"><div className="panel detail-main"><div className="detail-hero"><div className="robot-hero-icon"><Bot size={46} /></div><div><h2>{r.name}</h2><p>Идентификатор {r.id}</p><Badge tone={statusClass[r.status]} dot>{statusNames[r.status]}</Badge></div></div><div className="detail-stats"><div><small>Заряд батареи</small><strong>{r.battery}%</strong><div className="progress"><span style={{ width: `${r.battery}%` }} /></div></div><div><small>Текущий этаж</small><strong>{r.floor}</strong></div><div><small>Модель</small><strong>{r.model}</strong></div></div><h3 className="subheading">Текущая активность</h3><p className="muted">{r.task}</p><button className="secondary-button" onClick={() => notify('Команда отправлена в демонстрационном режиме')}><Zap size={16} /> Отправить тестовую команду</button></div><div className="panel"><SectionHeader title="Задачи робота" />{tasks.filter(t => t.robotId === r.id).map(t => <div className="simple-list-item" key={t.id}><b>{t.title}</b><small>{t.id} · {t.time}</small><Badge tone={taskClass[t.status]}>{t.status}</Badge></div>)}{!tasks.some(t => t.robotId === r.id) && <p className="muted">У робота пока нет задач.</p>}</div></div></> }
-function TasksPage({ tasks, setTasks, robots, notify }) { const [showForm, setShowForm] = useState(false); const [title, setTitle] = useState(''); const [kind, setKind] = useState('Уборка'); const [robotId, setRobotId] = useState(robots[0]?.id || ''); const [zone, setZone] = useState('Этаж 1 · Главный коридор'); const [filter, setFilter] = useState('Все'); 
+function TasksPage({ tasks, setTasks, robots, notify }) { const [showForm, setShowForm] = useState(false); const [title, setTitle] = useState(''); const [kind, setKind] = useState('Уборка'); const [robotId, setRobotId] = useState(robots[0]?.id || ''); const [zone, setZone] = useState('Этаж 1 · Главный коридор'); const [filter, setFilter] = useState('Все');
+    useEffect(() => {
+    if (robots.length > 0 && !robotId) {
+      setRobotId(robots[0].id);
+    }
+  }, [robots, robotId]);   
   // const addTask = e => { e.preventDefault(); if (!title.trim()) return; const t = { id: `T-${108 + tasks.length}`, title: title.trim(), kind, robotId, zone, status: 'Ожидает', priority: 'Обычный', time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) }; 
   // setTasks([t, ...tasks]); setTitle(''); setShowForm(false); notify(`Задача ${t.id} создана`) }; 
   // неотформатированный бред заменен на ниже
 
-  const addTask = async (e) => {
+      const addTask = async (e) => {
     e.preventDefault();
     if (!title.trim()) return;
+
+    // Если робот почему-то не выбран, берем первого из списка
+    const finalRobotId = robotId || (robots[0] ? robots[0].id : '');
+    
+    if (!finalRobotId) {
+        notify("Ошибка: нет доступных роботов");
+        return;
+    }
+    const payload = { title: title.trim(), kind, robotId: finalRobotId, zone };
+    console.log("Отправляем на сервер:", payload); // Это покажет в консоли, что мы отправляем
     try {
-        const response = await fetch('http://localhost:8000/api/tasks', {
+        const response = await fetch('http://127.0.0.1:8000/api/tasks', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             },
-            body: JSON.stringify({ title: title.trim(), kind, robotId, zone })
+            body: JSON.stringify(payload)
         });
+        
+        // Если сервер вернул ошибку выбрасываем исключение
+        if (!response.ok) {
+            throw new Error(`Ошибка сервера: ${response.status}`);
+        }
+
         const createdTask = await response.json();
         setTasks([createdTask, ...tasks]);
         setTitle('');
@@ -187,7 +206,7 @@ function TasksPage({ tasks, setTasks, robots, notify }) { const [showForm, setSh
         notify(`Задача ${createdTask.id} создана`);
     } catch (error) {
         console.error("Ошибка:", error);
-        notify("Ошибка сервера");
+        notify("Не удалось создать задачу. Проверьте вход в систему.");
     }
   };
 
