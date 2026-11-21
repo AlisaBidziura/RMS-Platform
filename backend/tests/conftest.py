@@ -3,18 +3,21 @@ import pytest_asyncio
 
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.engine import URL
 from main import app, get_db
 from models import Base
 # Если нужно, запустить отдельно, без основных тестов, то чтобы импортировалась нормально запускай в папке бэкенда
 
 @pytest_asyncio.fixture
-async def test_engine():
-    engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
+async def test_engine(tmp_path):
+    db_file = tmp_path / "test.db"
+
+    database_url = URL.create(
+        "sqlite+aiosqlite",
+        database=str(db_file),
     )
+
+    engine = create_async_engine(database_url)
 
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
