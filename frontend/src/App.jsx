@@ -1,32 +1,15 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
-  Activity, Bot, Boxes, Building2, ChartNoAxesCombined, CheckCircle2, ChevronDown,
-  CircleHelp, ClipboardList, Clock3, DoorOpen, FileText, LayoutDashboard,
-  LogOut, Map, MessageSquare, Plus, Radio, Route as RouteIcon, Search,
-  Settings, ShieldCheck, Users, Wifi, Zap, Bell, BatteryCharging, ArrowUpRight
+  Activity, Bot, Boxes, Building2, ChartNoAxesCombined, CheckCircle2,
+  CircleHelp, ClipboardList, Clock3, DoorOpen, FileText, Map,
+  MessageSquare, Plus, Radio, Route as RouteIcon, Search, ShieldCheck,
+  Zap, Bell, BatteryCharging, ArrowUpRight
 } from 'lucide-react'
 import { events } from './data.js'
+import { AppLayout } from './widgets/app-layout/index.js'
 import { Badge, EmptyState, PageHeading, SectionHeader, SettingRow, StatCard } from './shared/ui/index.js'
 
-const navGroups = [
-  {
-    label: 'РАБОЧЕЕ ПРОСТРАНСТВО', items: [
-      ['Обзор', '/dashboard', LayoutDashboard], ['Карта этажей', '/map', Map], ['Роботы', '/robots', Bot], ['Задачи', '/tasks', ClipboardList], ['Маршруты', '/routes', RouteIcon]
-    ]
-  },
-  {
-    label: 'АНАЛИЗ И УПРАВЛЕНИЕ', items: [
-      ['Аналитика', '/analytics', ChartNoAxesCombined], ['Инфраструктура', '/infrastructure', Building2], ['Интеграции', '/integrations', Radio], ['Сотрудники и роли', '/employees', Users]
-    ]
-  },
-  {
-    label: 'СИСТЕМА', items: [
-      ['Уведомления', '/notifications', Bell], ['ИИ-помощник', '/assistant', MessageSquare], ['Журнал действий', '/audit', FileText], ['Настройки', '/settings', Settings]
-    ]
-  }
-]
-const titles = Object.fromEntries(navGroups.flatMap(g => g.items.map(i => [i[1], i[0]])))
 const statusNames = { working: 'Выполняет задачу', available: 'Свободен', charging: 'Заряжается', warning: 'Требует внимания', offline: 'Не в сети' }
 const statusClass = { working: 'blue', available: 'green', charging: 'amber', warning: 'red', offline: 'gray' }
 const taskClass = { 'В работе': 'blue', 'Ожидает': 'amber', 'Требует внимания': 'red', 'Завершена': 'green', 'Отменена': 'gray' }
@@ -81,16 +64,16 @@ function App() {
     setLoggedIn(true); 
     navigate('/dashboard'); 
   }} />
-  return <div className="app-shell">
-    <aside className="sidebar">
-      <div className="brand"><div className="brand-mark"><Bot size={22} /></div><div><b>rms<span>.</span></b><small>ROBOT MANAGEMENT</small></div></div>
-      <div className="workspace"><div className="workspace-icon"><Building2 size={17} /></div><div><b>Demo Hospital</b><small>Локальный контур</small></div><ChevronDown size={15} /></div>
-      <nav>{navGroups.map(group => <div className="nav-group" key={group.label}><div className="nav-label">{group.label}</div>{group.items.map(([label, path, Icon]) => <NavLink key={path} to={path} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><Icon size={18} /><span>{label}</span>{path === '/notifications' && <i className="nav-dot" />}</NavLink>)}</div>)}</nav>
-      <div className="sidebar-bottom"><div className="connection"><span className="online-dot" /><div><b>Локальная сеть</b><small>Все сервисы доступны</small></div><Wifi size={16} /></div><div className="user-mini"><div className="avatar">DM</div><div className="user-info"><b>{localStorage.getItem('rms-demo-user') || 'Демо пользователь'}</b><small>{role}</small></div><button className="icon-button" title="Выйти" onClick={logout}><LogOut size={17} /></button></div></div>
-    </aside>
-    <main className="main-area">
-      <header className="topbar"><div className="breadcrumbs"><span>RMS Platform</span><span className="crumb-slash">/</span><b>{titles[location.pathname] || (location.pathname.startsWith('/robots/') ? 'Карточка робота' : 'Раздел')}</b></div><div className="top-actions"><div className="system-status"><span className="online-dot" /> Система работает</div><button className="icon-button notification-button" onClick={() => navigate('/notifications')}><Bell size={18} /><i /></button><div className="top-avatar">DM</div></div></header>
-      <div className="page-content"><Routes>
+  return (
+    <AppLayout
+      userName={localStorage.getItem('rms-demo-user') || 'Демо пользователь'}
+      role={role}
+      onLogout={logout}
+      pathname={location.pathname}
+      onOpenNotifications={() => navigate('/notifications')}
+      toast={toast}
+    >
+      <Routes>
         <Route path="/dashboard" element={<Dashboard robots={robots} tasks={tasks} notify={notify} navigate={navigate} />} />
         <Route path="/robots" element={<RobotsPage robots={robots} query={query} setQuery={setQuery} notify={notify} />} />
         <Route path="/robots/:id" element={<RobotDetail robots={robots} tasks={tasks} notify={notify} />} />
@@ -106,11 +89,9 @@ function App() {
         <Route path="/audit" element={<AuditPage tasks={tasks} />} />
         <Route path="/settings" element={<SettingsPage role={role} setRole={setRole} notify={notify} />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
-      </Routes></div>
-      <footer className="footer"><span>RMS Platform <b>v0.1 prototype</b></span><span><span className="online-dot" /> Демонстрационный режим · Данные хранятся в браузере</span></footer>
-    </main>
-    {toast && <div className="toast"><CheckCircle2 size={18} />{toast}</div>}
-  </div>
+      </Routes>
+    </AppLayout>
+  )
 }
 
 function LoginPage({ onLogin }) {
