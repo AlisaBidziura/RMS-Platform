@@ -41,3 +41,9 @@ export function clientToViewport(map, rect, clientX, clientY) {
     y: clamp((clientY - rect.top - top) / scale, 0, map.height),
   }
 }
+
+export function centerOn(view, map, point, minimumZoom = 2) {
+  if (!Number.isFinite(point?.x) || !Number.isFinite(point?.y)) return view
+  const zoom = clamp(Math.max(view.zoom, minimumZoom), MIN_ZOOM, MAX_ZOOM)
+  return constrain({ zoom, x: point.x - map.width / (2 * zoom), y: point.y - map.height / (2 * zoom) }, map)
+}

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Bot } from 'lucide-react'
+import { Bot, Play, Pause } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { Badge, PageHeading, SectionHeader } from '../../../shared/ui/index.js'
 import { statusClass, statusNames } from '../../../entities/robot/index.js'
@@ -11,7 +11,8 @@ import { useMapData } from '../model/useMapData.js'
 const mapSource = demoMapSource
 
 export function MapPage({ robots, floor, setFloor }) {
-  const { status, maps, positions, error, retry } = useMapData(mapSource)
+  const [motionEnabled, setMotionEnabled] = useState(false)
+  const { status, maps, positions, error, retry } = useMapData(mapSource, robots, motionEnabled)
   const [selection, setSelection] = useState(null)
   const [selectedMapId, setSelectedMapId] = useState(null)
   const map = maps.find(item => item.uid === selectedMapId && String(item.floor) === String(floor)) ||
@@ -62,13 +63,19 @@ export function MapPage({ robots, floor, setFloor }) {
                 <b>{map.name}</b>
                 <small>{isDemo ? 'Тестовый план · координаты не получены от роботов' : 'План помещения'}</small>
               </div>
-              {isDemo && <Badge tone="amber" dot>Демо-карта</Badge>}
+              {isDemo && <div className="map-toolbar-actions">
+                <Badge tone="amber" dot>Демо-карта</Badge>
+                <button className="map-motion-button" type="button" aria-pressed={motionEnabled} onClick={() => setMotionEnabled(value => !value)}>
+                  {motionEnabled ? <Pause size={14} /> : <Play size={14} />}
+                  {motionEnabled ? 'Остановить тест' : 'Тест движения'}
+                </button>
+              </div>}
             </div>
             <FloorMap key={`${map.uid}:${map.imageUrl}`} map={map} robots={onFloor} positions={mapPositions}
               selectedId={selected?.id} onSelect={selectRobot} isDemo={isDemo} />
             <div className="map-legend">
               <span><i className="legend-dot blue-bg" /> {isDemo ? 'Демонстрационные позиции' : 'Позиции роботов'}</span>
-              {isDemo && <span>Координаты с сервера недоступны</span>}
+              {isDemo && <span>{motionEnabled ? 'Тест движения · не связан с задачами' : 'Координаты с сервера недоступны'}</span>}
               {missingPositions > 0 && <span>Без позиции: {missingPositions}</span>}
             </div>
           </div>
@@ -92,7 +99,7 @@ export function MapPage({ robots, floor, setFloor }) {
             <div className="selected-object">
               <span className="eyebrow">ВЫБРАННЫЙ РОБОТ</span>
               <h3>{selected?.name || 'Ничего не выбрано'}</h3>
-              <p>{selected ? `${selected.id} · этаж ${map.floor}. ${getMapMarker(map, mapPositions.get(selected.id)) ? (isDemo ? 'Позиция демонстрационная.' : 'Позиция доступна.') : 'Позиция недоступна.'}` : 'Выберите робота на плане или в списке.'}</p>
+              <p>{selected ? `${selected.id} · этаж ${map.floor}. ${getMapMarker(map, mapPositions.get(selected.id)) ? (selected.status === 'offline' ? (isDemo ? 'Последняя демонстрационная позиция. Робот не в сети.' : 'Последняя известная позиция. Робот не в сети.') : isDemo ? 'Позиция демонстрационная.' : 'Позиция доступна.') : 'Позиция недоступна.'}` : 'Выберите робота на плане или в списке.'}</p>
               {selected && <NavLink className="secondary-button full-width" to={`/robots/${selected.id}`}>Карточка робота</NavLink>}
             </div>
           </div>

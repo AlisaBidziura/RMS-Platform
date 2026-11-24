@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
-import { isValidMap } from '../../../entities/map/index.js'
+import { useEffect, useRef, useState } from 'react'
+import { isValidMap, mergePositionSnapshot } from '../../../entities/map/index.js'
 
-export function useMapData(source) {
+export function useMapData(source, robots, motionEnabled) {
+  const robotsRef = useRef(robots)
+  useEffect(() => { robotsRef.current = robots }, [robots])
   const [requestId, setRequestId] = useState(0)
   const [result, setResult] = useState({ status: 'loading', maps: [], positions: [], error: '' })
 
@@ -27,6 +29,23 @@ export function useMapData(source) {
     // При смене источника или закрытии страницы не принимаем устаревший ответ.
     return () => controller.abort()
   }, [source, requestId])
+
+  const positionsRef = useRef(result.positions)
+  useEffect(() => { positionsRef.current = result.positions }, [result.positions])
+
+  useEffect(() => {
+    if (result.status !== 'ready' || (source.mode === 'demo' && !motionEnabled) || !source.subscribePositions) return
+    const controller = new AbortController()
+    const unsubscribe = source.subscribePositions(positions => {
+      if (controller.signal.aborted || !Array.isArray(positions)) return
+      const currentRobots = robotsRef.current
+      setResult(current => ({ ...current, positions: source.mode === 'demo' ? mergePositionSnapshot(current.positions, positions, currentRobots) : positions }))
+    }, { signal: controller.signal, initialPositions: positionsRef.current })
+    return () => {
+      controller.abort()
+      unsubscribe?.()
+    }
+  }, [source, result.status, motionEnabled])
 
   function retry() {
     setResult({ status: 'loading', maps: [], positions: [], error: '' })

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { Minus, Plus, Maximize } from 'lucide-react'
-import { INITIAL_VIEW, MIN_ZOOM, MAX_ZOOM, clientToViewport, getViewportFit, panBy, zoomAt } from '../model/mapViewport.js'
+import { Minus, Plus, Maximize, Crosshair } from 'lucide-react'
+import { INITIAL_VIEW, MIN_ZOOM, MAX_ZOOM, clientToViewport, getViewportFit, panBy, zoomAt, centerOn } from '../model/mapViewport.js'
+import { useAnimatedMarker } from '../model/useAnimatedMarker.js'
 import { getMapMarker } from '../../../entities/map/index.js'
 
 const statusColors = {
@@ -11,6 +12,31 @@ const statusColors = {
   offline: '#64748b',
 }
 
+function RobotMarker({ target, robot, active, isDemo, zoom, onSelect }) {
+  const offline = robot.status === 'offline'
+  const marker = useAnimatedMarker(target, offline, isDemo)
+  const label = `${robot.name}${isDemo ? ', демонстрационная позиция' : ''}${offline ? ', не в сети, последняя известная позиция' : ''}`
+  return (
+    <g className={`floor-map-marker${offline ? ' is-offline' : ''}`} transform={`translate(${marker.x} ${marker.y}) scale(${1 / zoom})`}
+      role="button" tabIndex={0} aria-label={label} aria-pressed={active} onClick={() => onSelect(robot.id)}
+      onKeyDown={event => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault()
+          onSelect(robot.id)
+        }
+      }}>
+      <title>{label}</title>
+      {active && <circle r="22" fill="none" stroke="#7895ef" strokeWidth="3" />}
+      <circle r="16" fill={statusColors[robot.status] || statusColors.offline} stroke="white" strokeWidth="2" strokeDasharray={offline ? '3 2' : undefined} />
+      {marker.rotation === null ? <circle r="4" fill="white" /> : (
+        <path d="M -6 -7 L 10 0 L -6 7 L -2 0 Z" fill="white" transform={`rotate(${marker.rotation})`} />
+      )}
+      <rect x="-30" y="22" width="60" height="21" rx="5" fill="#334056" />
+      <text y="36" fill="white" fontSize="12" textAnchor="middle">{robot.id}</text>
+    </g>
+  )
+}
+
 export function FloorMap({ map, robots, positions, selectedId, onSelect, isDemo = false }) {
   const [failedImage, setFailedImage] = useState(false)
   const [view, setView] = useState(INITIAL_VIEW)
@@ -19,6 +45,7 @@ export function FloorMap({ map, robots, positions, selectedId, onSelect, isDemo 
   const dragRef = useRef(null)
   const clipId = useId()
   const { width, height } = map
+  const selectedMarker = robots.some(robot => robot.id === selectedId) ? getMapMarker(map, positions.get(selectedId)) : null
 
   useEffect(() => {
     const svg = svgRef.current
@@ -103,29 +130,8 @@ export function FloorMap({ map, robots, positions, selectedId, onSelect, isDemo 
             {robots.map(robot => {
               const marker = getMapMarker(map, positions.get(robot.id))
               if (!marker) return null
-              const active = robot.id === selectedId
-              const label = isDemo ? `${robot.name}, демонстрационная позиция` : robot.name
-    
-              return (
-                <g key={robot.id} className="floor-map-marker" transform={`translate(${marker.x} ${marker.y}) scale(${1 / view.zoom})`}
-                  role="button" tabIndex={0} aria-label={label}
-                  aria-pressed={active} onClick={() => onSelect(robot.id)}
-                  onKeyDown={event => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      onSelect(robot.id)
-                    }
-                  }}>
-                  <title>{label}</title>
-                  {active && <circle r="22" fill="none" stroke="#7895ef" strokeWidth="3" />}
-                  <circle r="16" fill={statusColors[robot.status] || statusColors.offline} stroke="white" strokeWidth="2" />
-                  {marker.rotation === null ? <circle r="4" fill="white" /> : (
-                    <path d="M -6 -7 L 10 0 L -6 7 L -2 0 Z" fill="white" transform={`rotate(${marker.rotation})`} />
-                  )}
-                  <rect x="-30" y="22" width="60" height="21" rx="5" fill="#334056" />
-                  <text y="36" fill="white" fontSize="12" textAnchor="middle">{robot.id}</text>
-                </g>
-              )
+              return <RobotMarker key={robot.id} target={marker} robot={robot} active={robot.id === selectedId}
+                isDemo={isDemo} zoom={view.zoom} onSelect={onSelect} />
             })}
           </g>
         </g>
@@ -134,6 +140,8 @@ export function FloorMap({ map, robots, positions, selectedId, onSelect, isDemo 
         <button type="button" title="Приблизить" aria-label="Приблизить" onClick={() => changeZoom(1.25)} disabled={view.zoom >= MAX_ZOOM}><Plus size={18} /></button>
         <button type="button" title="Отдалить" aria-label="Отдалить" onClick={() => changeZoom(1 / 1.25)} disabled={view.zoom <= MIN_ZOOM}><Minus size={18} /></button>
         <button type="button" title="Вписать карту" aria-label="Вписать карту" onClick={resetView}><Maximize size={16} /></button>
+        <button type="button" title="Показать выбранного робота" aria-label="Показать выбранного робота" disabled={!selectedMarker}
+          onClick={() => setView(current => centerOn(current, map, selectedMarker))}><Crosshair size={18} /></button>
         <output className="floor-map-zoom" aria-label="Текущий масштаб">{Math.round(view.zoom * 100)}%</output>
       </div>
       <div className="floor-map-hint">Колесо — масштаб · перетаскивание — перемещение</div>
