@@ -1,0 +1,298 @@
+.filter-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  background: white;
+  border: 1px solid #e3e8f0;
+  border-radius: 8px;
+  height: 38px;
+  min-width: 230px;
+  color: #98a3b3;
+}
+
+.search-box input {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  min-width: 0;
+  width: 100%;
+  font-size: 11px;
+  color: #26344b;
+}
+
+.filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.filter-pills button {
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-size: 10px;
+  color: #8994a5;
+}
+
+.filter-pills button:hover {
+  background: white;
+}
+
+.filter-pills button.selected {
+  background: #eaf0ff;
+  border-color: #dce5ff;
+  color: #4163d1;
+  font-weight: 700;
+}
+
+.result-count {
+  font-size: 10px;
+  color: #9aa4b4;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.robot-grid {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 15px;
+}
+
+.robot-card {
+  background: #fff;
+  border: 1px solid #e8edf4;
+  border-radius: 12px;
+  padding: 18px;
+  min-width: 0;
+  transition: .15s;
+}
+
+.robot-card:hover {
+  border-color: #cbd7fb;
+  box-shadow: 0 8px 24px #24365a0a;
+  transform: translateY(-1px);
+}
+
+.robot-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.robot-large-icon {
+  width: 45px;
+  height: 45px;
+  display: grid;
+  place-items: center;
+  background: #edf2ff;
+  color: #4b6cdd;
+  border-radius: 12px;
+  margin-right: auto;
+}
+
+.robot-card h3 {
+  font: 700 14px Manrope;
+  margin: 15px 0 5px;
+  color: #253248;
+}
+
+.robot-card>p {
+  font-size: 10px;
+  color: #98a2b1;
+  margin: 0;
+}
+
+.robot-card-type {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 10px;
+  color: #637087;
+}
+
+.robot-card-type span {
+  color: #9aa4b3;
+}
+
+.robot-battery {
+  margin-top: 16px;
+}
+
+.battery-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #8994a5;
+  margin-bottom: 7px;
+}
+
+.battery-label b {
+  color: #536176;
+}
+
+.progress {
+  height: 5px;
+  background: #edf0f5;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.progress>span {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: #2aa879;
+}
+
+.progress>span.low {
+  background: #d85d5d;
+}
+
+.robot-current-task {
+  padding: 12px 0;
+  border-bottom: 1px solid #eef1f5;
+  margin-top: 13px;
+}
+
+.robot-current-task small,.robot-current-task b {
+  display: block;
+}
+
+.robot-current-task small {
+  font-size: 9px;
+  color: #9aa4b3;
+  margin-bottom: 5px;
+}
+
+.robot-current-task b {
+  font-size: 10px;
+  color: #59667a;
+  line-height: 1.4;
+}
+
+.card-link {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #4d6bd9;
+  background: transparent;
+  border: 0;
+  padding: 13px 0 0;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.card-link:hover {
+  color: #2746b6;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 18px;
+}
+
+.detail-hero {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.robot-hero-icon {
+  width: 78px;
+  height: 78px;
+  border-radius: 18px;
+  background: #edf2ff;
+  color: #4d6ddd;
+  display: grid;
+  place-items: center;
+}
+
+.detail-hero h2 {
+  font: 800 20px Manrope;
+  margin: 0 0 6px;
+}
+
+.detail-hero p {
+  font-size: 11px;
+  color: #8995a6;
+  margin: 0 0 10px;
+}
+
+.detail-stats {
+  display: grid;
+  grid-template-columns: repeat(3,1fr);
+  gap: 18px;
+  padding: 22px 0;
+}
+
+.detail-stats small,.detail-stats strong {
+  display: block;
+}
+
+.detail-stats small {
+  font-size: 10px;
+  color: #8d98a8;
+  margin-bottom: 8px;
+}
+
+.detail-stats strong {
+  font: 700 19px Manrope;
+  color: #27344a;
+}
+
+.detail-stats .progress {
+  margin-top: 8px;
+}
+
+.subheading {
+  font: 700 12px Manrope;
+  margin: 8px 0;
+}
+
+.muted {
+  font-size: 11px;
+  color: #8d98a8;
+  line-height: 1.6;
+}
+
+.simple-list-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 13px 0;
+  border-bottom: 1px solid #eff1f6;
+}
+
+.simple-list-item:last-child {
+  border-bottom: 0;
+}
+
+.simple-list-item>b {
+  font-size: 11px;
+  color: #344056;
+}
+
+.simple-list-item>small {
+  font-size: 10px;
+  color: #919cad;
+}
+
+.simple-list-item .badge {
+  margin-top: 2px;
+}

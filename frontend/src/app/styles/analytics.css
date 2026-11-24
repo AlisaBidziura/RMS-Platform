@@ -1,0 +1,145 @@
+.analytics-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 17px;
+  margin-bottom: 18px;
+}
+
+.bar-chart {
+  height: 220px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  padding: 12px 8px 0;
+  gap: 14px;
+  background: repeating-linear-gradient(to bottom,transparent 0,transparent 43px,#edf0f5 44px);
+}
+
+.bar-column {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+}
+
+.bar-column>span {
+  font-size: 9px;
+  color: #7b88a0;
+}
+
+.bar-column>div {
+  height: 75%;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.bar-column i {
+  display: block;
+  width: min(35px,65%);
+  background: linear-gradient(180deg,#7e9aff,#4169e1);
+  border-radius: 5px 5px 0 0;
+}
+
+.bar-column small {
+  font-size: 9px;
+  color: #8995a6;
+  padding-bottom: 3px;
+}
+
+.chart-caption {
+  font-size: 9px;
+  color: #a0a9b7;
+  text-align: center;
+  margin-top: 12px;
+}
+
+.analytics-status {
+  margin-bottom: 17px;
+}
+
+.analytics-status>div:first-child {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.analytics-status>div:first-child span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #758196;
+  font-size: 10px;
+}
+
+.analytics-status b {
+  font-size: 11px;
+  color: #344056;
+}
+
+.progress>span.blue {
+  background: #5272e5;
+}
+
+.progress>span.green {
+  background: #20a779;
+}
+
+.progress>span.amber {
+  background: #e3a13b;
+}
+
+.progress>span.red {
+  background: #d95e5e;
+}
+
+.load-table {
+  display: grid;
+}
+
+.load-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #eff1f6;
+}
+
+.load-row:last-child {
+  border: 0;
+}
+
+.load-name {
+  width: 150px;
+}
+
+.load-name b,.load-name small {
+  display: block;
+}
+
+.load-name b {
+  font-size: 10px;
+  color: #354156;
+}
+
+.load-name small {
+  font-size: 9px;
+  color: #9aa4b3;
+  margin-top: 3px;
+}
+
+.load-bar {
+  flex: 1;
+}
+
+.load-row> b {
+  font-size: 10px;
+  color: #68758a;
+  width: 35px;
+}

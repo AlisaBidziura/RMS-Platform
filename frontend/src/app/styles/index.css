@@ -1,0 +1,15 @@
+/* Порядок подключения сохраняет каскад общих стилей и адаптивных переопределений. */
+@import './base.css';
+@import './layout.css';
+@import './common.css';
+@import './dashboard.css';
+@import './robots.css';
+@import './forms-and-tables.css';
+@import './maps.css';
+@import './routes.css';
+@import './analytics.css';
+@import './management.css';
+@import './assistant.css';
+@import './settings-and-feedback.css';
+@import './login.css';
+@import './responsive.css';
