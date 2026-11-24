@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   Activity, Bot, Boxes, Building2, ChartNoAxesCombined, CheckCircle2, ChevronDown,
-  CircleHelp, ClipboardList, Clock3, DoorOpen, FileText, Gauge, LayoutDashboard,
-  LogOut, Map, Menu, MessageSquare, Plus, Radio, Route as RouteIcon, Search,
-  Settings, ShieldCheck, Users, Wifi, X, Zap, Bell, BatteryCharging, ArrowUpRight
+  CircleHelp, ClipboardList, Clock3, DoorOpen, FileText, LayoutDashboard,
+  LogOut, Map, MessageSquare, Plus, Radio, Route as RouteIcon, Search,
+  Settings, ShieldCheck, Users, Wifi, Zap, Bell, BatteryCharging, ArrowUpRight
 } from 'lucide-react'
-import { initialRobots, initialTasks, events } from './data.js'
+import { events } from './data.js'
 
 const navGroups = [
   {
@@ -29,38 +29,17 @@ const titles = Object.fromEntries(navGroups.flatMap(g => g.items.map(i => [i[1],
 const statusNames = { working: 'Выполняет задачу', available: 'Свободен', charging: 'Заряжается', warning: 'Требует внимания', offline: 'Не в сети' }
 const statusClass = { working: 'blue', available: 'green', charging: 'amber', warning: 'red', offline: 'gray' }
 const taskClass = { 'В работе': 'blue', 'Ожидает': 'amber', 'Требует внимания': 'red', 'Завершена': 'green', 'Отменена': 'gray' }
-const readStored = (key, fallback) => { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback } catch { return fallback } }
 
 function App() {
   const [loggedIn, setLoggedIn] = useState(() => localStorage.getItem('rms-demo-login') === 'yes')
   const [role, setRole] = useState(() => localStorage.getItem('rms-demo-role') || 'Диспетчер')
-  // const [robots, setRobots] = useState(() => readStored('rms-robots', initialRobots))
-  // const [tasks, setTasks] = useState(() => readStored('rms-tasks', initialTasks))
-  // заменено на ниже useEffect для загрузки данных с бэкенда
   const [robots, setRobots] = useState([])
   const [tasks, setTasks] = useState([])
 
-  // useEffect(() => {
-  //   // Загружаем роботов
-  //   fetch('http://localhost:8000/api/robots')
-  //     .then(res => res.json())
-  //     .then(data => setRobots(data))
-  //     .catch(err => console.error("Ошибка загрузки роботов:", err));
-
-  //   // Загружаем задачи
-  //   fetch('http://localhost:8000/api/tasks')
-  //     .then(res => res.json())
-  //     .then(data => setTasks(data))
-  //     .catch(err => console.error("Ошибка загрузки задач:", err));
-  // }, []);
-
-  
   useEffect(() => {
-    // Первичная загрузка данных
     fetch('http://127.0.0.1:8000/api/robots').then(res => res.json()).then(data => setRobots(data)).catch(console.error);
     fetch('http://127.0.0.1:8000/api/tasks').then(res => res.json()).then(data => setTasks(data)).catch(console.error);
 
-    // WebSocket
     const ws = new WebSocket('ws://127.0.0.1:8000/ws');
     
     ws.onmessage = (event) => {
@@ -71,8 +50,8 @@ function App() {
       }
     };
 
-  return () => ws.close();
-}, []);
+    return () => ws.close();
+  }, []);
 
   const [query, setQuery] = useState('')
   const [floor, setFloor] = useState('2')
@@ -160,30 +139,22 @@ function RobotsPage({ robots, query, setQuery, notify }) {
   return <><PageHeading eyebrow="УПРАВЛЕНИЕ ПАРКОМ" title="Роботы" description="Список подключённых устройств и их текущее состояние." action={<button className="primary-button" onClick={() => notify('Добавление реального робота появится в следующей версии')}><Plus size={17} /> Добавить робота</button>} /><div className="filter-toolbar"><div className="search-box"><Search size={17} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Поиск по имени, ID или типу..." /></div><div className="filter-pills">{['Все', 'Свободен', 'Выполняет задачу', 'Заряжается', 'Требует внимания'].map(s => <button key={s} className={filter === s ? 'selected' : ''} onClick={() => setFilter(s)}>{s}</button>)}</div><span className="result-count">{filtered.length} устройств</span></div><div className="robot-grid">{filtered.map(r => <RobotCard key={r.id} robot={r} />)}</div>{filtered.length === 0 && <EmptyState title="Роботы не найдены" text="Измените поисковый запрос или фильтр." />}</>
 }
 function RobotCard({ robot: r }) { const navigate = useNavigate(); return <div className="robot-card"><div className="robot-card-top"><div className="robot-large-icon"><Bot size={27} /></div><Badge tone={statusClass[r.status]} dot>{statusNames[r.status]}</Badge><button className="icon-button" onClick={() => navigate(`/robots/${r.id}`)}><ArrowUpRight size={17} /></button></div><h3>{r.name}</h3><p>{r.id} · {r.model}</p><div className="robot-card-type">{r.type}<span>Этаж {r.floor}</span></div><div className="robot-battery"><div className="battery-label"><span>Уровень заряда</span><b>{r.battery}%</b></div><div className="progress"><span style={{ width: `${r.battery}%` }} className={r.battery < 25 ? 'low' : ''} /></div></div><div className="robot-current-task"><small>Текущая активность</small><b>{r.task}</b></div><NavLink className="card-link" to={`/robots/${r.id}`}>Открыть карточку <ArrowUpRight size={15} /></NavLink></div> }
-function RobotDetail({ robots, tasks, notify }) { const { id } = useLocation().pathname.match(/\/robots\/([^/]+)/)?.[1] ? { id: useLocation().pathname.match(/\/robots\/([^/]+)/)[1] } : { id: '' }; const r = robots.find(x => x.id === id); if (!r) return <EmptyState title="Робот не найден" text="Вернитесь в каталог и выберите устройство." />; return <><PageHeading eyebrow={`РОБОТ ${r.id}`} title={r.name} description={`${r.type} · ${r.model}`} action={<Badge tone={statusClass[r.status]} dot>{statusNames[r.status]}</Badge>} /><div className="detail-grid"><div className="panel detail-main"><div className="detail-hero"><div className="robot-hero-icon"><Bot size={46} /></div><div><h2>{r.name}</h2><p>Идентификатор {r.id}</p><Badge tone={statusClass[r.status]} dot>{statusNames[r.status]}</Badge></div></div><div className="detail-stats"><div><small>Заряд батареи</small><strong>{r.battery}%</strong><div className="progress"><span style={{ width: `${r.battery}%` }} /></div></div><div><small>Текущий этаж</small><strong>{r.floor}</strong></div><div><small>Модель</small><strong>{r.model}</strong></div></div><h3 className="subheading">Текущая активность</h3><p className="muted">{r.task}</p><button className="secondary-button" onClick={() => notify('Команда отправлена в демонстрационном режиме')}><Zap size={16} /> Отправить тестовую команду</button></div><div className="panel"><SectionHeader title="Задачи робота" />{tasks.filter(t => t.robotId === r.id).map(t => <div className="simple-list-item" key={t.id}><b>{t.title}</b><small>{t.id} · {t.time}</small><Badge tone={taskClass[t.status]}>{t.status}</Badge></div>)}{!tasks.some(t => t.robotId === r.id) && <p className="muted">У робота пока нет задач.</p>}</div></div></> }
+function RobotDetail({ robots, tasks, notify }) { const { id } = useParams(); const r = robots.find(x => x.id === id); if (!r) return <EmptyState title="Робот не найден" text="Вернитесь в каталог и выберите устройство." />; return <><PageHeading eyebrow={`РОБОТ ${r.id}`} title={r.name} description={`${r.type} · ${r.model}`} action={<Badge tone={statusClass[r.status]} dot>{statusNames[r.status]}</Badge>} /><div className="detail-grid"><div className="panel detail-main"><div className="detail-hero"><div className="robot-hero-icon"><Bot size={46} /></div><div><h2>{r.name}</h2><p>Идентификатор {r.id}</p><Badge tone={statusClass[r.status]} dot>{statusNames[r.status]}</Badge></div></div><div className="detail-stats"><div><small>Заряд батареи</small><strong>{r.battery}%</strong><div className="progress"><span style={{ width: `${r.battery}%` }} /></div></div><div><small>Текущий этаж</small><strong>{r.floor}</strong></div><div><small>Модель</small><strong>{r.model}</strong></div></div><h3 className="subheading">Текущая активность</h3><p className="muted">{r.task}</p><button className="secondary-button" onClick={() => notify('Команда отправлена в демонстрационном режиме')}><Zap size={16} /> Отправить тестовую команду</button></div><div className="panel"><SectionHeader title="Задачи робота" />{tasks.filter(t => t.robotId === r.id).map(t => <div className="simple-list-item" key={t.id}><b>{t.title}</b><small>{t.id} · {t.time}</small><Badge tone={taskClass[t.status]}>{t.status}</Badge></div>)}{!tasks.some(t => t.robotId === r.id) && <p className="muted">У робота пока нет задач.</p>}</div></div></> }
 function TasksPage({ tasks, setTasks, robots, notify }) { const [showForm, setShowForm] = useState(false); const [title, setTitle] = useState(''); const [kind, setKind] = useState('Уборка'); const [robotId, setRobotId] = useState(robots[0]?.id || ''); const [zone, setZone] = useState('Этаж 1 · Главный коридор'); const [filter, setFilter] = useState('Все');
-    useEffect(() => {
-    if (robots.length > 0 && !robotId) {
-      setRobotId(robots[0].id);
-    }
-  }, [robots, robotId]);   
-  // const addTask = e => { e.preventDefault(); if (!title.trim()) return; const t = { id: `T-${108 + tasks.length}`, title: title.trim(), kind, robotId, zone, status: 'Ожидает', priority: 'Обычный', time: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) }; 
-  // setTasks([t, ...tasks]); setTitle(''); setShowForm(false); notify(`Задача ${t.id} создана`) }; 
-  // неотформатированный бред заменен на ниже
+  // Список роботов загружается асинхронно, поэтому начальный выбор вычисляется при рендере.
+  const selectedRobotId = robotId || robots[0]?.id || '';
 
-      const addTask = async (e) => {
+  const addTask = async (e) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    // Если робот почему-то не выбран, берем первого из списка
-    const finalRobotId = robotId || (robots[0] ? robots[0].id : '');
+    const finalRobotId = selectedRobotId;
     
     if (!finalRobotId) {
         notify("Ошибка: нет доступных роботов");
         return;
     }
     const payload = { title: title.trim(), kind, robotId: finalRobotId, zone };
-    console.log("Отправляем на сервер:", payload); // Это покажет в консоли, что мы отправляем
     try {
         const response = await fetch('http://127.0.0.1:8000/api/tasks', {
             method: 'POST',
@@ -194,7 +165,6 @@ function TasksPage({ tasks, setTasks, robots, notify }) { const [showForm, setSh
             body: JSON.stringify(payload)
         });
         
-        // Если сервер вернул ошибку выбрасываем исключение
         if (!response.ok) {
             throw new Error(`Ошибка сервера: ${response.status}`);
         }
@@ -210,7 +180,6 @@ function TasksPage({ tasks, setTasks, robots, notify }) { const [showForm, setSh
     }
   };
 
-  // const changeStatus = (t, next) => { setTasks(tasks.map(x => x.id === t.id ? { ...x, status: next } : x)); notify(`Статус задачи ${t.id} изменён`) }; 
   
   const changeStatus = async (t, next) => {
     try {
@@ -231,7 +200,7 @@ function TasksPage({ tasks, setTasks, robots, notify }) { const [showForm, setSh
     }
   };
 
-  const shown = tasks.filter(t => filter === 'Все' || t.status === filter); return <><PageHeading eyebrow="ПЛАНИРОВАНИЕ РАБОТ" title="Задачи" description="Создавайте задания, назначайте роботов и отслеживайте выполнение." action={<button className="primary-button" onClick={() => setShowForm(!showForm)}><Plus size={17} /> Новая задача</button>} />{showForm && <form className="panel task-form" onSubmit={addTask}><SectionHeader title="Новая задача" /><div className="form-grid"><label>Название<input value={title} onChange={e => setTitle(e.target.value)} placeholder="Например, доставка документов" required /></label><label>Тип задачи<select value={kind} onChange={e => setKind(e.target.value)}><option>Уборка</option><option>Доставка</option><option>Патрулирование</option><option>Зарядка</option></select></label><label>Назначить робота<select value={robotId} onChange={e => setRobotId(e.target.value)}>{robots.map(r => <option key={r.id} value={r.id}>{r.name} ({r.id})</option>)}</select></label><label>Зона / маршрут<input value={zone} onChange={e => setZone(e.target.value)} required /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowForm(false)}>Отмена</button><button className="primary-button" type="submit"><Plus size={16} /> Создать задачу</button></div></form>}<div className="filter-toolbar"><div className="filter-pills">{['Все', 'Ожидает', 'В работе', 'Требует внимания', 'Завершена', 'Отменена'].map(s => <button key={s} className={filter === s ? 'selected' : ''} onClick={() => setFilter(s)}>{s}</button>)}</div><span className="result-count">{shown.length} задач</span></div><div className="panel table-panel"><div className="table-wrap"><table><thead><tr><th>ЗАДАЧА</th><th>РОБОТ</th><th>ЗОНА</th><th>СТАТУС</th><th>ВРЕМЯ</th><th>ДЕЙСТВИЯ</th></tr></thead><tbody>{shown.map(t => <tr key={t.id}><td><b>{t.title}</b><small>{t.id} · {t.kind}</small></td><td><span className="table-robot"><Bot size={15} />{t.robotId}</span></td><td>{t.zone}</td><td><Badge tone={taskClass[t.status] || 'gray'} dot>{t.status}</Badge></td><td>{t.time}</td><td><select className="status-select" value={t.status} onChange={e => changeStatus(t, e.target.value)} aria-label={`Статус ${t.id}`}><option>Ожидает</option><option>В работе</option><option>Требует внимания</option><option>Завершена</option><option>Отменена</option></select></td></tr>)}</tbody></table></div>{shown.length === 0 && <EmptyState title="Задач пока нет" text="Создайте новую задачу или выберите другой фильтр." />}</div></> }
+  const shown = tasks.filter(t => filter === 'Все' || t.status === filter); return <><PageHeading eyebrow="ПЛАНИРОВАНИЕ РАБОТ" title="Задачи" description="Создавайте задания, назначайте роботов и отслеживайте выполнение." action={<button className="primary-button" onClick={() => setShowForm(!showForm)}><Plus size={17} /> Новая задача</button>} />{showForm && <form className="panel task-form" onSubmit={addTask}><SectionHeader title="Новая задача" /><div className="form-grid"><label>Название<input value={title} onChange={e => setTitle(e.target.value)} placeholder="Например, доставка документов" required /></label><label>Тип задачи<select value={kind} onChange={e => setKind(e.target.value)}><option>Уборка</option><option>Доставка</option><option>Патрулирование</option><option>Зарядка</option></select></label><label>Назначить робота<select value={selectedRobotId} onChange={e => setRobotId(e.target.value)}>{robots.map(r => <option key={r.id} value={r.id}>{r.name} ({r.id})</option>)}</select></label><label>Зона / маршрут<input value={zone} onChange={e => setZone(e.target.value)} required /></label></div><div className="form-actions"><button type="button" className="secondary-button" onClick={() => setShowForm(false)}>Отмена</button><button className="primary-button" type="submit"><Plus size={16} /> Создать задачу</button></div></form>}<div className="filter-toolbar"><div className="filter-pills">{['Все', 'Ожидает', 'В работе', 'Требует внимания', 'Завершена', 'Отменена'].map(s => <button key={s} className={filter === s ? 'selected' : ''} onClick={() => setFilter(s)}>{s}</button>)}</div><span className="result-count">{shown.length} задач</span></div><div className="panel table-panel"><div className="table-wrap"><table><thead><tr><th>ЗАДАЧА</th><th>РОБОТ</th><th>ЗОНА</th><th>СТАТУС</th><th>ВРЕМЯ</th><th>ДЕЙСТВИЯ</th></tr></thead><tbody>{shown.map(t => <tr key={t.id}><td><b>{t.title}</b><small>{t.id} · {t.kind}</small></td><td><span className="table-robot"><Bot size={15} />{t.robotId}</span></td><td>{t.zone}</td><td><Badge tone={taskClass[t.status] || 'gray'} dot>{t.status}</Badge></td><td>{t.time}</td><td><select className="status-select" value={t.status} onChange={e => changeStatus(t, e.target.value)} aria-label={`Статус ${t.id}`}><option>Ожидает</option><option>В работе</option><option>Требует внимания</option><option>Завершена</option><option>Отменена</option></select></td></tr>)}</tbody></table></div>{shown.length === 0 && <EmptyState title="Задач пока нет" text="Создайте новую задачу или выберите другой фильтр." />}</div></> }
 function MapPage({ robots, floor, setFloor, notify }) { const [selected, setSelected] = useState(''); const onFloor = robots.filter(r => String(r.floor) === floor); return <><PageHeading eyebrow="ПРОСТРАНСТВЕННЫЙ МОНИТОРИНГ" title="Карта этажей" description="Положение роботов, зоны работы и инфраструктура предприятия." action={<div className="floor-switch">{['1', '2', '3'].map(f => <button className={floor === f ? 'selected' : ''} key={f} onClick={() => { setFloor(f); setSelected('') }}>Этаж {f}</button>)}</div>} /><div className="map-layout"><div className="panel map-panel"><div className="map-toolbar"><div><b>План здания · Этаж {floor}</b><small>Демонстрационная схема помещений</small></div><Badge tone="green" dot>Схема загружена</Badge></div><div className="floor-map"><div className="map-grid-lines" /><div className="room room-a"><span>Холл</span></div><div className="room room-b"><span>Коридор A</span></div><div className="room room-c"><span>Склад</span></div><div className="room room-d"><span>Кабинеты</span></div><div className="room room-e"><span>Лифт</span><DoorOpen size={18} /></div><div className="route-line route-one" /><div className="route-line route-two" />{onFloor.map((r, i) => <button key={r.id} className={`map-robot map-robot-${i % 4} ${selected === r.id ? 'chosen' : ''}`} onClick={() => setSelected(r.id)} title={r.name}><Bot size={20} /><span>{r.id}</span></button>)}<button className="map-charger" onClick={() => { setSelected('Зарядная станция A-01'); notify('Выбрана зарядная станция A-01') }}><Zap size={17} /><span>A-01</span></button><div className="map-compass">N ↑</div></div><div className="map-legend"><span><i className="legend-dot blue-bg" /> Роботы</span><span><i className="legend-line" /> Активный маршрут</span><span><i className="legend-dot green-bg" /> Зарядная станция</span><span><DoorOpen size={14} /> Двери / лифты</span></div></div><div className="panel map-side"><SectionHeader title="Объекты этажа" /><div className="map-object-list">{onFloor.map(r => <button className={`map-object ${selected === r.id ? 'active' : ''}`} key={r.id} onClick={() => setSelected(r.id)}><div className="robot-avatar"><Bot size={17} /></div><div><b>{r.name}</b><small>{r.id} · заряд {r.battery}%</small></div><Badge tone={statusClass[r.status]}>{r.status === 'working' ? 'В работе' : r.status === 'available' ? 'Свободен' : r.status === 'charging' ? 'Зарядка' : 'Внимание'}</Badge></button>)}<button className={`map-object ${selected === 'Зарядная станция A-01' ? 'active' : ''}`} onClick={() => setSelected('Зарядная станция A-01')}><div className="robot-avatar green"><Zap size={17} /></div><div><b>Зарядная станция A-01</b><small>Электропитание · Онлайн</small></div></button></div><div className="selected-object"><span className="eyebrow">ВЫБРАННЫЙ ОБЪЕКТ</span><h3>{selected || 'Ничего не выбрано'}</h3><p>{selected ? robots.find(r => r.id === selected) ? `Этаж ${floor}. Нажмите на карточку робота, чтобы выбрать его на плане.` : 'Инфраструктурный объект. Управление представлено в демо-режиме.' : 'Выберите робота или инфраструктуру на плане.'}</p>{selected && <button className="secondary-button full-width" onClick={() => notify(`Открыты данные: ${selected}`)}>Подробнее об объекте</button>}</div></div></div></> }
 function RoutesPage({ notify }) { const routes = [['RT-01', 'Ежедневная уборка коридора', 'Мойщик пола', 'Этаж 1 · 6 точек', '12 мин'], ['RT-02', 'Доставка из склада', 'Транспортный', 'Этаж 2 · 4 точки', '8 мин'], ['RT-03', 'Маршрут приёмной зоны', 'Пылесос', 'Этаж 1 · 5 точек', '15 мин'], ['RT-04', 'Доставка документов', 'Транспортный', 'Этаж 3 · 3 точки', '6 мин']]; return <><PageHeading eyebrow="НАВИГАЦИЯ" title="Маршруты" description="Шаблоны перемещения роботов по зонам предприятия." action={<button className="primary-button" onClick={() => notify('Создание маршрута будет доступно в следующей итерации')}><Plus size={17} /> Новый маршрут</button>} /><div className="route-grid">{routes.map((r, i) => <div className="panel route-card" key={r[0]}><div className="route-card-top"><div className="route-icon"><RouteIcon size={22} /></div><Badge tone={i === 1 ? 'blue' : 'green'}>{i === 1 ? 'Используется' : 'Активен'}</Badge></div><span className="eyebrow">{r[0]}</span><h3>{r[1]}</h3><p>{r[2]}</p><div className="route-card-meta"><span><Map size={15} />{r[3]}</span><span><Clock3 size={15} />{r[4]}</span></div><button className="card-link" onClick={() => notify(`Открыт маршрут ${r[0]} в демо-режиме`)}>Открыть маршрут <ArrowUpRight size={15} /></button></div>)}</div></> }
 function AnalyticsPage({ robots, tasks }) { const done = tasks.filter(t => t.status === 'Завершена').length; const chart = [['08:00', 4], ['09:00', 7], ['10:00', 5], ['11:00', 9], ['12:00', 6], ['13:00', 8], ['14:00', 10]]; return <><PageHeading eyebrow="ОТЧЁТНОСТЬ" title="Аналитика" description="Сводные показатели использования парка и выполнения задач." action={<button className="secondary-button" onClick={() => window.print()}><FileText size={16} /> Печать отчёта</button>} /><div className="stats-grid"><StatCard label="Всего задач" value={tasks.length} icon={ClipboardList} tone="blue" foot="за выбранный период" /><StatCard label="Завершено" value={done} icon={CheckCircle2} tone="green" foot="успешно выполнено" /><StatCard label="Выполнение" value={`${tasks.length ? Math.round(done / tasks.length * 100) : 0}%`} icon={ChartNoAxesCombined} tone="violet" foot="от общего числа задач" /><StatCard label="Парк онлайн" value={`${robots.length}/${robots.length}`} icon={Radio} tone="green" foot="демонстрационные устройства" /></div><div className="analytics-grid"><div className="panel"><SectionHeader title="Активность по часам" /><div className="bar-chart">{chart.map(([time, val]) => <div className="bar-column" key={time}><span>{val}</span><div><i style={{ height: `${val * 8}%` }} /></div><small>{time}</small></div>)}</div><div className="chart-caption">Количество выполненных задач · пример данных</div></div><div className="panel"><SectionHeader title="Распределение задач" />{[['Завершена', tasks.filter(t => t.status === 'Завершена').length, 'green'], ['В работе', tasks.filter(t => t.status === 'В работе').length, 'blue'], ['Ожидает', tasks.filter(t => t.status === 'Ожидает').length, 'amber'], ['Требует внимания', tasks.filter(t => t.status === 'Требует внимания').length, 'red']].map(([name, n, tone]) => <div className="analytics-status" key={name}><div><span><i className={`legend-dot ${tone}-bg`} />{name}</span><b>{n}</b></div><div className="progress"><span className={tone} style={{ width: `${tasks.length ? n / tasks.length * 100 : 0}%` }} /></div></div>)}</div></div><div className="panel"><SectionHeader title="Загрузка роботов" /><div className="load-table">{robots.map(r => <div className="load-row" key={r.id}><div className="robot-avatar"><Bot size={17} /></div><div className="load-name"><b>{r.name}</b><small>{r.id}</small></div><div className="load-bar"><div className="progress"><span style={{ width: `${r.battery}%` }} /></div></div><b>{r.battery}%</b><Badge tone={statusClass[r.status]}>{statusNames[r.status]}</Badge></div>)}</div></div></> }
