@@ -1,100 +1,103 @@
 import { useState } from 'react'
-import { Bot, DoorOpen, Zap } from 'lucide-react'
+import { Bot } from 'lucide-react'
+import { NavLink } from 'react-router-dom'
 import { Badge, PageHeading, SectionHeader } from '../../../shared/ui/index.js'
-import { statusClass } from '../../../entities/robot/index.js'
+import { statusClass, statusNames } from '../../../entities/robot/index.js'
+import { demoMapSource, getMapMarker } from '../../../entities/map/index.js'
+import { FloorMap } from '../../../widgets/floor-map/index.js'
+import { useMapData } from '../model/useMapData.js'
 
-export function MapPage({
-  robots,
-  floor,
-  setFloor,
-  notify
-}) {
-  const [selected, setSelected] = useState('');
-  const onFloor = robots.filter(r => String(r.floor) === floor);
-  return <>
-      <PageHeading eyebrow="ПРОСТРАНСТВЕННЫЙ МОНИТОРИНГ" title="Карта этажей" description="Положение роботов, зоны работы и инфраструктура предприятия." action={<div className="floor-switch">{['1', '2', '3'].map(f => <button className={floor === f ? 'selected' : ''} key={f} onClick={() => {
-        setFloor(f);
-        setSelected('');
-      }}>Этаж {f}</button>)}</div>} />
-      <div className="map-layout">
-        <div className="panel map-panel">
-          <div className="map-toolbar">
-            <div>
-              <b>План здания · Этаж {floor}</b>
-              <small>Демонстрационная схема помещений</small>
-            </div>
-            <Badge tone="green" dot>Схема загружена</Badge>
+// Пока RMS не предоставляет карты, источник выбран явно. При ошибке API демоданные не подставляются.
+const mapSource = demoMapSource
+
+export function MapPage({ robots, floor, setFloor }) {
+  const { status, maps, positions, error, retry } = useMapData(mapSource)
+  const [selection, setSelection] = useState(null)
+  const [selectedMapId, setSelectedMapId] = useState(null)
+  const map = maps.find(item => item.uid === selectedMapId && String(item.floor) === String(floor)) ||
+    maps.find(item => String(item.floor) === String(floor)) || maps[0]
+  const isDemo = mapSource.mode === 'demo'
+  const onFloor = map ? robots.filter(robot => String(robot.floor) === String(map.floor)) : []
+  const mapPositions = new Map(positions.filter(position => position?.mapId === map?.uid).map(position => [position.robotId, position]))
+  const selected = selection && selection.mapId === map?.uid ? onFloor.find(robot => robot.id === selection.robotId) : null
+  const missingPositions = onFloor.filter(robot => !getMapMarker(map, mapPositions.get(robot.id))).length
+
+  function selectMap(nextMap) {
+    setFloor(String(nextMap.floor))
+    setSelectedMapId(nextMap.uid)
+    setSelection(null)
+  }
+
+  function selectRobot(robotId) {
+    setSelection({ mapId: map.uid, robotId })
+  }
+
+  return (
+    <>
+      <PageHeading eyebrow="ПРОСТРАНСТВЕННЫЙ МОНИТОРИНГ" title="Карта этажей"
+        description="Просмотр планов помещений и состояния роботов."
+        action={maps.length > 0 && (
+          <div className="floor-switch">
+            {maps.map(item => (
+              <button key={item.uid} className={map?.uid === item.uid ? 'selected' : ''}
+                aria-pressed={map?.uid === item.uid} onClick={() => selectMap(item)}>
+                {item.name}
+              </button>
+            ))}
           </div>
-          <div className="floor-map">
-            <div className="map-grid-lines" />
-            <div className="room room-a">
-              <span>Холл</span>
+        )} />
+      {status === 'loading' && <div className="panel map-page-message" role="status">Загрузка карт…</div>}
+      {status === 'error' && (
+        <div className="panel map-page-message" role="alert">
+          <p>{error}</p>
+          <button className="secondary-button" onClick={retry}>Повторить</button>
+        </div>
+      )}
+      {status === 'ready' && !map && <div className="panel map-page-message">Нет доступных карт.</div>}
+      {status === 'ready' && map && (
+        <div className="map-layout">
+          <div className="panel map-panel">
+            <div className="map-toolbar">
+              <div>
+                <b>{map.name}</b>
+                <small>{isDemo ? 'Тестовый план · координаты не получены от роботов' : 'План помещения'}</small>
+              </div>
+              {isDemo && <Badge tone="amber" dot>Демо-карта</Badge>}
             </div>
-            <div className="room room-b">
-              <span>Коридор A</span>
+            <FloorMap key={`${map.uid}:${map.imageUrl}`} map={map} robots={onFloor} positions={mapPositions}
+              selectedId={selected?.id} onSelect={selectRobot} isDemo={isDemo} />
+            <div className="map-legend">
+              <span><i className="legend-dot blue-bg" /> {isDemo ? 'Демонстрационные позиции' : 'Позиции роботов'}</span>
+              {isDemo && <span>Координаты с сервера недоступны</span>}
+              {missingPositions > 0 && <span>Без позиции: {missingPositions}</span>}
             </div>
-            <div className="room room-c">
-              <span>Склад</span>
-            </div>
-            <div className="room room-d">
-              <span>Кабинеты</span>
-            </div>
-            <div className="room room-e">
-              <span>Лифт</span>
-              <DoorOpen size={18} />
-            </div>
-            <div className="route-line route-one" />
-            <div className="route-line route-two" />
-            {onFloor.map((r, i) => <button key={r.id} className={`map-robot map-robot-${i % 4} ${selected === r.id ? 'chosen' : ''}`} onClick={() => setSelected(r.id)} title={r.name}>
-              <Bot size={20} />
-              <span>{r.id}</span>
-            </button>)}
-            <button className="map-charger" onClick={() => {
-            setSelected('Зарядная станция A-01');
-            notify('Выбрана зарядная станция A-01');
-          }}>
-              <Zap size={17} />
-              <span>A-01</span>
-            </button>
-            <div className="map-compass">N ↑</div>
           </div>
-          <div className="map-legend">
-            <span><i className="legend-dot blue-bg" /> Роботы</span>
-            <span><i className="legend-line" /> Активный маршрут</span>
-            <span><i className="legend-dot green-bg" /> Зарядная станция</span>
-            <span><DoorOpen size={14} /> Двери / лифты</span>
+          <div className="panel map-side">
+            <SectionHeader title="Роботы этажа" />
+            <div className="map-object-list">
+              {onFloor.length === 0 && <p>На этаже нет роботов.</p>}
+              {onFloor.map(robot => (
+                <button key={robot.id} className={`map-object ${selected?.id === robot.id ? 'active' : ''}`}
+                  aria-pressed={selected?.id === robot.id} onClick={() => selectRobot(robot.id)}>
+                  <div className="robot-avatar"><Bot size={17} /></div>
+                  <div>
+                    <b>{robot.name}</b>
+                    <small>{robot.id} · заряд {robot.battery}%</small>
+                    {!getMapMarker(map, mapPositions.get(robot.id)) && <small>Позиция недоступна</small>}
+                  </div>
+                  <Badge tone={statusClass[robot.status] || 'gray'}>{statusNames[robot.status] || 'Неизвестно'}</Badge>
+                </button>
+              ))}
+            </div>
+            <div className="selected-object">
+              <span className="eyebrow">ВЫБРАННЫЙ РОБОТ</span>
+              <h3>{selected?.name || 'Ничего не выбрано'}</h3>
+              <p>{selected ? `${selected.id} · этаж ${map.floor}. ${getMapMarker(map, mapPositions.get(selected.id)) ? (isDemo ? 'Позиция демонстрационная.' : 'Позиция доступна.') : 'Позиция недоступна.'}` : 'Выберите робота на плане или в списке.'}</p>
+              {selected && <NavLink className="secondary-button full-width" to={`/robots/${selected.id}`}>Карточка робота</NavLink>}
+            </div>
           </div>
         </div>
-        <div className="panel map-side">
-          <SectionHeader title="Объекты этажа" />
-          <div className="map-object-list">
-            {onFloor.map(r => <button className={`map-object ${selected === r.id ? 'active' : ''}`} key={r.id} onClick={() => setSelected(r.id)}>
-              <div className="robot-avatar">
-                <Bot size={17} />
-              </div>
-              <div>
-                <b>{r.name}</b>
-                <small>{r.id} · заряд {r.battery}%</small>
-              </div>
-              <Badge tone={statusClass[r.status]}>{r.status === 'working' ? 'В работе' : r.status === 'available' ? 'Свободен' : r.status === 'charging' ? 'Зарядка' : 'Внимание'}</Badge>
-            </button>)}
-            <button className={`map-object ${selected === 'Зарядная станция A-01' ? 'active' : ''}`} onClick={() => setSelected('Зарядная станция A-01')}>
-              <div className="robot-avatar green">
-                <Zap size={17} />
-              </div>
-              <div>
-                <b>Зарядная станция A-01</b>
-                <small>Электропитание · Онлайн</small>
-              </div>
-            </button>
-          </div>
-          <div className="selected-object">
-            <span className="eyebrow">ВЫБРАННЫЙ ОБЪЕКТ</span>
-            <h3>{selected || 'Ничего не выбрано'}</h3>
-            <p>{selected ? robots.find(r => r.id === selected) ? `Этаж ${floor}. Нажмите на карточку робота, чтобы выбрать его на плане.` : 'Инфраструктурный объект. Управление представлено в демо-режиме.' : 'Выберите робота или инфраструктуру на плане.'}</p>
-            {selected && <button className="secondary-button full-width" onClick={() => notify(`Открыты данные: ${selected}`)}>Подробнее об объекте</button>}
-          </div>
-        </div>
-      </div>
-    </>;
+      )}
+    </>
+  )
 }
