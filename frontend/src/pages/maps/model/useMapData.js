@@ -1,54 +1,74 @@
 import { useEffect, useRef, useState } from 'react'
-import { isValidMap, mergePositionSnapshot } from '../../../entities/map/index.js'
+import { loadMapCatalog, loadPositionSnapshot, normalizePositionSnapshot, mergePositionSnapshot } from '../../../entities/map/index.js'
+
+const initialResult = { status: 'loading', maps: [], positions: [], error: '', positionStatus: 'loading' }
 
 export function useMapData(source, robots, motionEnabled) {
   const robotsRef = useRef(robots)
   useEffect(() => { robotsRef.current = robots }, [robots])
   const [requestId, setRequestId] = useState(0)
-  const [result, setResult] = useState({ status: 'loading', maps: [], positions: [], error: '' })
+  const [result, setResult] = useState(initialResult)
 
   useEffect(() => {
     const controller = new AbortController()
-    Promise.resolve().then(() => Promise.all([
-      source.getMaps({ signal: controller.signal }),
-      source.getPositions({ signal: controller.signal }),
-    ])).then(([maps, positions]) => {
-      if (controller.signal.aborted) return
-      if (!Array.isArray(maps) || !maps.every(isValidMap) || !Array.isArray(positions)) {
-        throw new Error('Некорректный формат данных карты')
+    const { signal } = controller
+    async function load() {
+      let maps
+      try {
+        maps = await loadMapCatalog(source, signal)
+      } catch {
+        if (!signal.aborted) setResult({ ...initialResult, status: 'error', error: 'Не удалось получить данные карты.' })
+        return
       }
-      if (new Set(maps.map(map => map.uid)).size !== maps.length) {
-        throw new Error('Повторяющиеся идентификаторы карт')
+      if (signal.aborted) return
+      setResult({ ...initialResult, status: 'ready', maps, positionStatus: maps.length ? 'loading' : 'ready' })
+      if (!maps.length) return
+      try {
+        const positions = await loadPositionSnapshot(source, maps, signal)
+        if (!signal.aborted) setResult(current => ({ ...current, positions, positionStatus: 'ready' }))
+      } catch {
+        // Недоступная телеметрия не мешает просмотру уже полученного плана.
+        if (!signal.aborted) setResult(current => ({ ...current, positionStatus: 'error' }))
       }
-      setResult({ status: 'ready', maps, positions, error: '' })
-    }).catch(() => {
-      if (!controller.signal.aborted) {
-        setResult({ status: 'error', maps: [], positions: [], error: 'Не удалось получить данные карты.' })
-      }
-    })
-    // При смене источника или закрытии страницы не принимаем устаревший ответ.
+    }
+    load()
     return () => controller.abort()
   }, [source, requestId])
 
   const positionsRef = useRef(result.positions)
   useEffect(() => { positionsRef.current = result.positions }, [result.positions])
+  const canSubscribe = result.status === 'ready' && result.positionStatus !== 'loading' && result.maps.length > 0
 
   useEffect(() => {
-    if (result.status !== 'ready' || (source.mode === 'demo' && !motionEnabled) || !source.subscribePositions) return
+    if (!canSubscribe || (source.mode === 'demo' && !motionEnabled) || !source.subscribePositions) return
     const controller = new AbortController()
-    const unsubscribe = source.subscribePositions(positions => {
-      if (controller.signal.aborted || !Array.isArray(positions)) return
-      const currentRobots = robotsRef.current
-      setResult(current => ({ ...current, positions: source.mode === 'demo' ? mergePositionSnapshot(current.positions, positions, currentRobots) : positions }))
-    }, { signal: controller.signal, initialPositions: positionsRef.current })
+    const { signal } = controller
+    function onError() {
+      if (!signal.aborted) setResult(current => ({ ...current, positionStatus: 'error' }))
+    }
+    let unsubscribe
+    try {
+      unsubscribe = source.subscribePositions(positions => {
+        if (signal.aborted) return
+        try {
+          const snapshot = normalizePositionSnapshot(positions, result.maps)
+          const currentRobots = robotsRef.current
+          setResult(current => ({ ...current, positionStatus: 'ready', positions: source.mode === 'demo' ? mergePositionSnapshot(current.positions, snapshot, currentRobots) : snapshot }))
+        } catch {
+          onError()
+        }
+      }, { signal, initialPositions: positionsRef.current, onError })
+    } catch {
+      onError()
+    }
     return () => {
       controller.abort()
       unsubscribe?.()
     }
-  }, [source, result.status, motionEnabled])
+  }, [source, canSubscribe, result.maps, motionEnabled, requestId])
 
   function retry() {
-    setResult({ status: 'loading', maps: [], positions: [], error: '' })
+    setResult(initialResult)
     setRequestId(id => id + 1)
   }
 

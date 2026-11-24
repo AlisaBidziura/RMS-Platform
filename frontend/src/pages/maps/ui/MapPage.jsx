@@ -59,7 +59,7 @@ function RobotPanel({ robots, visibleRobots, map, positions, selected, onSelect,
 
 export function MapPage({ robots, floor, setFloor }) {
   const [motionEnabled, setMotionEnabled] = useState(false)
-  const { status, maps, positions, error, retry } = useMapData(mapSource, robots, motionEnabled)
+  const { status, maps, positions, error, positionStatus, retry } = useMapData(mapSource, robots, motionEnabled)
   const [selection, setSelection] = useState(null)
   const [selectedMapId, setSelectedMapId] = useState(null)
   const [query, setQuery] = useState('')
@@ -115,7 +115,7 @@ export function MapPage({ robots, floor, setFloor }) {
             <div className="map-toolbar">
               <div className="map-toolbar-title"><div className="map-title-icon"><Layers size={20} /></div><div><b>План помещения · {map.name}</b><small>{isDemo ? 'Демо-карта · позиции не получены от роботов' : 'Карта помещения'}</small></div></div>
               <div className="map-toolbar-actions">
-                {isDemo && <button className="map-motion-button" type="button" aria-pressed={motionEnabled} onClick={() => setMotionEnabled(value => !value)}>{motionEnabled ? <Pause size={15} /> : <Play size={15} />}{motionEnabled ? 'Остановить тест' : 'Тест движения'}</button>}
+                {isDemo && <button className="map-motion-button" type="button" aria-pressed={motionEnabled} disabled={positionStatus === 'loading'} onClick={() => setMotionEnabled(value => !value)}>{motionEnabled ? <Pause size={15} /> : <Play size={15} />}{motionEnabled ? 'Остановить тест' : 'Тест движения'}</button>}
                 <button className="map-icon-button" type="button" title={sideVisible ? 'Скрыть панель роботов' : 'Показать панель роботов'} aria-label={sideVisible ? 'Скрыть панель роботов' : 'Показать панель роботов'} aria-expanded={sideVisible} aria-controls={sideVisible ? 'map-robot-panel' : undefined} onClick={() => setSideVisible(value => !value)}>{sideVisible ? <PanelRightClose size={19} /> : <PanelRightOpen size={19} />}</button>
                 <button className="map-icon-button" type="button" title={fullscreen ? 'Выйти из полноэкранного режима' : 'На весь экран'} aria-label={fullscreen ? 'Выйти из полноэкранного режима' : 'На весь экран'} aria-pressed={fullscreen} onClick={toggleFullscreen}>{fullscreen ? <Minimize2 size={19} /> : <Maximize2 size={19} />}</button>
               </div>
@@ -124,6 +124,8 @@ export function MapPage({ robots, floor, setFloor }) {
               <div className="floor-switch" role="group" aria-label="Выбор этажа">{maps.map(item => <button key={item.uid} type="button" className={map.uid === item.uid ? 'selected' : ''} aria-pressed={map.uid === item.uid} onClick={() => selectMap(item)}>{item.name}</button>)}</div>
               <div className="map-summary"><span>Роботов <strong>{onFloor.length}</strong></span><span>На карте <strong>{onFloor.length - missingPositions}</strong></span>{missingPositions > 0 && <span>Без позиции <strong>{missingPositions}</strong></span>}</div>
             </div>
+            {positionStatus === 'loading' && <p className="map-telemetry-message" role="status">Загрузка координат роботов…</p>}
+            {positionStatus === 'error' && <div className="map-telemetry-message is-error" role="alert"><span>Обновление координат недоступно. На карте могут оставаться последние полученные позиции.</span><button type="button" className="secondary-button" onClick={retry}>Повторить</button></div>}
             {fullscreenError && <p className="map-fullscreen-error" role="alert">{fullscreenError}</p>}
             <FloorMap key={`${map.uid}:${map.imageUrl}`} map={map} robots={onFloor} positions={mapPositions} selectedId={selected?.id} onSelect={selectRobot} isDemo={isDemo} />
             <div className="map-legend">

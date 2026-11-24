@@ -292,3 +292,7 @@
   .map-workspace .map-legend { padding: 0 10px 12px; }
   .map-workspace:fullscreen { padding: 8px; }
 }
+
+.map-telemetry-message { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 10px 16px 0; padding: 8px 10px; border-radius: 7px; background: #f5f7fb; color: #526379; font-size: 12px; line-height: 1.4; }
+.map-telemetry-message.is-error { background: #fff6e8; color: #875611; }
+.map-telemetry-message .secondary-button { min-height: 28px; padding: 4px 9px; font-size: 11px; }
