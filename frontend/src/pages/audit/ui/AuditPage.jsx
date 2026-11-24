@@ -1,5 +1,5 @@
 import { FileText } from 'lucide-react'
-import { events } from '../../../data.js'
+import { demoEvents as events } from '../../../entities/event/index.js'
 import { Badge, PageHeading } from '../../../shared/ui/index.js'
 
 export function AuditPage({

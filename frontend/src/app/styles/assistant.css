@@ -1,0 +1,141 @@
+.assistant-layout {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.assistant-chat {
+  padding: 0;
+  overflow: hidden;
+}
+
+.assistant-chat-header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 17px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.assistant-avatar {
+  width: 39px;
+  height: 39px;
+  border-radius: 12px;
+  background: #edf2ff;
+  color: #5271dc;
+  display: grid;
+  place-items: center;
+}
+
+.assistant-chat-header b,.assistant-chat-header small {
+  display: block;
+}
+
+.assistant-chat-header b {
+  font-size: 12px;
+  color: #344056;
+}
+
+.assistant-chat-header small {
+  font-size: 9px;
+  color: #929dad;
+  margin-top: 5px;
+}
+
+.assistant-chat-header small .online-dot {
+  margin-right: 5px;
+}
+
+.chat-messages {
+  padding: 18px;
+  min-height: 250px;
+  max-height: 420px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.chat-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 88%;
+}
+
+.chat-message p {
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 0;
+  padding: 11px 13px;
+  border-radius: 3px 12px 12px;
+  background: #f2f5fa;
+  color: #536176;
+}
+
+.chat-message.user {
+  align-self: flex-end;
+}
+
+.chat-message.user p {
+  background: #eaf0ff;
+  color: #3d59b5;
+  border-radius: 12px 3px 12px 12px;
+}
+
+.chat-bot-icon {
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
+  background: #edf2ff;
+  color: #5271dc;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.chat-suggestions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 0 18px 15px;
+}
+
+.chat-suggestions button {
+  background: white;
+  border: 1px solid #e2e8f3;
+  border-radius: 20px;
+  padding: 7px 9px;
+  color: #6b7b96;
+  font-size: 9px;
+}
+
+.chat-suggestions button:hover {
+  background: #f4f6ff;
+  border-color: #cfd9fb;
+}
+
+.chat-input {
+  display: flex;
+  gap: 8px;
+  padding: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.chat-input input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #e0e6ef;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 11px;
+}
+
+.chat-input .primary-button {
+  padding: 9px 12px;
+}
+
+.assistant-side .simple-list-item:first-of-type {
+  padding-top: 0;
+}

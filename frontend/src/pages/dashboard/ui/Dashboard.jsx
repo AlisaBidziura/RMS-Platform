@@ -1,5 +1,5 @@
 import { Activity, Bot, Boxes, Clock3, FileText, Plus, Zap, BatteryCharging } from 'lucide-react'
-import { events } from '../../../data.js'
+import { demoEvents as events } from '../../../entities/event/index.js'
 import { Badge, PageHeading, SectionHeader, StatCard } from '../../../shared/ui/index.js'
 import { statusNames, statusClass } from '../../../entities/robot/index.js'
 import { taskClass } from '../../../entities/task/index.js'

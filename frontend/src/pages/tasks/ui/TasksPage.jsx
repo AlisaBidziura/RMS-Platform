@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Bot, Plus } from 'lucide-react'
 import { Badge, EmptyState, PageHeading, SectionHeader } from '../../../shared/ui/index.js'
+import { API_BASE_URL } from '../../../shared/config/api.js'
 import { taskClass } from '../../../entities/task/index.js'
 
 export function TasksPage({
@@ -32,7 +33,7 @@ export function TasksPage({
       zone
     };
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/tasks', {
+      const response = await fetch(`${API_BASE_URL}/api/tasks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -55,7 +56,7 @@ export function TasksPage({
   };
   const changeStatus = async (t, next) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/tasks/${t.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/tasks/${t.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

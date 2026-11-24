@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { API_BASE_URL, WS_URL } from '../shared/config/api.js'
 import { AppRouter } from './router/AppRouter.jsx'
 
 function App() {
@@ -9,10 +10,10 @@ function App() {
   const [tasks, setTasks] = useState([])
 
   useEffect(() => {
-    fetch('http://127.0.0.1:8000/api/robots').then(res => res.json()).then(data => setRobots(data)).catch(console.error);
-    fetch('http://127.0.0.1:8000/api/tasks').then(res => res.json()).then(data => setTasks(data)).catch(console.error);
+    fetch(`${API_BASE_URL}/api/robots`).then(res => res.json()).then(data => setRobots(data)).catch(console.error);
+    fetch(`${API_BASE_URL}/api/tasks`).then(res => res.json()).then(data => setTasks(data)).catch(console.error);
 
-    const ws = new WebSocket('ws://127.0.0.1:8000/ws');
+    const ws = new WebSocket(WS_URL);
 
     ws.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -37,7 +38,7 @@ function App() {
 
   const login = async (name) => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/login', {
+      const res = await fetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ login: name, password: '12345' })
