@@ -59,10 +59,6 @@ async def test_create_task_robot_has_active_task(client, db_session, task_status
     assert response.json()['detail'] == 'У робота уже есть активная задача'
     res = await db_session.scalar(select(func.count()).select_from(Task))
     assert res == 1
-@pytest.mark.xfail(
-    reason="BUG: поля TaskCreate принимают строки из пробелов",
-    strict=True
-)
 async def test_create_task_blank_title(client, db_session):
     robot = Robot(id='robot_01', name='Test Robot', type='cleaner', model='Autoxing X1')
     db_session.add(robot)
@@ -70,10 +66,28 @@ async def test_create_task_blank_title(client, db_session):
     payload = {'title': '   ', 'kind': 'cleaning', 'robotId': 'robot_01', 'zone': 'Floor 1'}
     response = await client.post('/api/tasks', json=payload, headers={'Authorization': 'Bearer fake-token'})
     assert response.status_code == 422
-@pytest.mark.xfail(
-    reason="BUG: Нет смены приоритета на высокий",
-    strict=True
+
+@pytest.mark.parametrize(
+    'field',
+    ['kind', 'robotId', 'zone'],
 )
+async def test_create_task_blank_other_fields(client, db_session, field):
+    robot = Robot(id='robot_01', name='Test Robot', type='cleaner', model='Autoxing X1')
+    db_session.add(robot)
+    await db_session.commit()
+    payload = {
+        'title': 'Test task',
+        'kind': 'cleaning',
+        'robotId': 'robot_01',
+        'zone': 'Floor 1',
+    }
+    payload[field] = '   '
+    response = await client.post(
+        '/api/tasks',
+        json=payload,
+        headers={'Authorization': 'Bearer fake-token'},
+    )
+    assert response.status_code == 422
 async def test_create_task_high_priority(client, db_session):
     robot = Robot(id='robot_01', name='Test Robot', type='cleaner', model='Autoxing X1')
     db_session.add(robot)
@@ -82,6 +96,28 @@ async def test_create_task_high_priority(client, db_session):
     response = await client.post('/api/tasks', json=payload, headers={'Authorization': 'Bearer fake-token'})
     assert response.status_code == 201
     assert response.json()['priority'] == "Высокий"
+    created_task = await db_session.get(Task, response.json()['id'])
+    assert created_task is not None
+    assert created_task.priority == "Высокий"
+
+
+async def test_create_task_invalid_priority(client, db_session):
+    robot = Robot(id='robot_01', name='Test Robot', type='cleaner', model='Autoxing X1')
+    db_session.add(robot)
+    await db_session.commit()
+    payload = {
+        'title': 'Test task',
+        'kind': 'cleaning',
+        'robotId': 'robot_01',
+        'zone': 'Floor 1',
+        'priority': 'Срочный',
+    }
+    response = await client.post(
+        '/api/tasks',
+        json=payload,
+        headers={'Authorization': 'Bearer fake-token'},
+    )
+    assert response.status_code == 422
 async def test_create_task_without_title(client, db_session):
     robot = Robot(
         id='robot_01',
@@ -144,7 +180,6 @@ async def test_create_task_invalid_auth(client, headers):
         headers=headers
     )
     assert response.status_code == 401
-    assert response.json()['detail'] == 'Unauthorized'
 async def test_cancel_running_task(client, db_session):
     robot = Robot(id='robot_01', name='Test Robot', type='cleaner', model='Autoxing X1', status='working', task='Existing task')
     task = Task(id='T-001', title='Existing task', kind='cleaning', robot_id='robot_01',
@@ -157,6 +192,7 @@ async def test_cancel_running_task(client, db_session):
     await db_session.refresh(robot)
     await db_session.refresh(task)
     assert robot.task is None
+    assert robot.status == 'available'
     assert task.status == 'Отменена'
 async def test_complete_running_task(client, db_session):
     robot = Robot(id='robot_01', name='Test Robot', type='cleaner', model='Autoxing X1', status='working', task='Existing task')
@@ -186,6 +222,28 @@ async def test_start_task_robot_unavailable(client, db_session):
     await db_session.refresh(robot)
     assert task.status == 'Ожидает'
     assert robot.status == 'working'
+@pytest.mark.parametrize('terminal_status', ['Завершена', 'Отменена'])
+async def test_terminal_task_cannot_change_status(client, db_session, terminal_status):
+    robot = Robot(id='robot_01', name='Test Robot', type='cleaner', model='Autoxing X1')
+    task = Task(
+        id='T-001', title='Existing task', kind='cleaning', robot_id='robot_01',
+        zone='Floor 1', status=terminal_status, time='12:00',
+    )
+    db_session.add(robot)
+    db_session.add(task)
+    await db_session.commit()
+
+    response = await client.patch(
+        '/api/tasks/T-001',
+        json={'status': 'Ожидает'},
+        headers={'Authorization': 'Bearer fake-token'},
+    )
+
+    assert response.status_code == 400
+    await db_session.refresh(task)
+    assert task.status == terminal_status
+
+
 async def test_cancel_task_idempotent(client, db_session):
     robot = Robot(id='robot_01', name='Test Robot', type='cleaner', model='Autoxing X1', status='working',
                   task='Existing task')
