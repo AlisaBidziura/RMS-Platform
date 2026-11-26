@@ -1,0 +1,278 @@
+@media(max-width:1200px) {
+  .sidebar {
+    width: 220px;
+  }
+  .main-area {
+    margin-left: 220px;
+  }
+  .page-content {
+    padding: 27px 24px;
+  }
+  .topbar {
+    padding: 0 24px;
+  }
+  .stats-grid {
+    gap: 10px;
+  }
+  .stat-card {
+    padding: 15px;
+  }
+  .robot-grid,.route-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+  .dashboard-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .mini-robot .badge {
+    display: none;
+  }
+  .map-layout {
+    grid-template-columns: minmax(0,1.5fr) minmax(240px,1fr);
+  }
+}
+
+@media(max-width:900px) {
+  .sidebar {
+    width: 70px;
+    padding: 20px 9px;
+  }
+  .brand {
+    padding: 0 5px 25px;
+    justify-content: center;
+  }
+  .brand>div:nth-child(2),.workspace>div:not(.workspace-icon),.workspace>svg,.nav-label,.nav-item span,.nav-dot,.connection>div,.connection>svg,.user-info,.sidebar-bottom .icon-button {
+    display: none;
+  }
+  .workspace {
+    justify-content: center;
+    padding: 9px 0;
+    margin: 0 0 20px;
+  }
+  .nav-item {
+    justify-content: center;
+    padding: 0;
+  }
+  .nav-group {
+    margin-bottom: 18px;
+  }
+  .nav-item svg {
+    width: 19px;
+    height: 19px;
+  }
+  .connection {
+    justify-content: center;
+    padding: 12px 0;
+  }
+  .user-mini {
+    justify-content: center;
+    padding-top: 12px;
+  }
+  .main-area {
+    margin-left: 70px;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+  .dashboard-grid,.analytics-grid {
+    grid-template-columns: 1fr;
+  }
+  .map-layout {
+    grid-template-columns: 1fr;
+  }
+  .map-side {
+    order: 2;
+  }
+  .login-screen {
+    grid-template-columns: 1fr;
+  }
+  .login-decoration {
+    min-height: 360px;
+    padding: 8%;
+  }
+  .login-art {
+    top: 8%;
+    right: 10%;
+    transform: scale(.7);
+  }
+  .login-copy {
+    margin-top: 75px;
+  }
+  .login-copy h1 {
+    font-size: 34px;
+  }
+  .login-form-wrap {
+    padding: 45px 25px;
+  }
+  .login-brand {
+    margin-bottom: 35px;
+  }
+  .login-decoration {
+    display: none;
+  }
+  .login-form-wrap {
+    min-height: 100vh;
+  }
+  .footer {
+    padding: 14px 24px;
+  }
+}
+
+@media(max-width:600px) {
+  .topbar {
+    height: 55px;
+    padding: 0 14px;
+  }
+  .system-status {
+    display: none;
+  }
+  .page-content {
+    padding: 23px 13px;
+  }
+  .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    margin-bottom: 20px;
+  }
+  .page-heading h1 {
+    font-size: 24px;
+  }
+  .page-heading>.primary-button,.page-heading>.secondary-button {
+    align-self: stretch;
+  }
+  .stats-grid {
+    gap: 9px;
+  }
+  .stat-card {
+    padding: 13px;
+  }
+  .stat-top {
+    font-size: 9px;
+  }
+  .stat-icon {
+    width: 30px;
+    height: 30px;
+  }
+  .stat-value {
+    font-size: 24px;
+  }
+  .stat-foot {
+    font-size: 8px;
+    flex-wrap: wrap;
+  }
+  .panel {
+    padding: 15px;
+  }
+  .dashboard-grid {
+    gap: 12px;
+  }
+  .fleet-summary {
+    gap: 12px;
+  }
+  .fleet-ring {
+    width: 110px;
+    height: 110px;
+  }
+  .fleet-ring strong {
+    font-size: 25px;
+  }
+  .fleet-legend {
+    min-width: 105px;
+  }
+  .fleet-legend>div {
+    font-size: 9px;
+  }
+  .panel-divider {
+    margin-left: -15px;
+    margin-right: -15px;
+  }
+  .robot-grid,.route-grid,.integration-grid,.settings-layout,.detail-grid,.assistant-layout {
+    grid-template-columns: 1fr;
+  }
+  .filter-toolbar {
+    align-items: stretch;
+  }
+  .search-box {
+    min-width: 100%;
+  }
+  .filter-pills {
+    gap: 2px;
+  }
+  .filter-pills button {
+    padding: 7px;
+    font-size: 9px;
+  }
+  .result-count {
+    width: 100%;
+    margin: 0;
+  }
+  .map-toolbar {
+    padding: 14px;
+  }
+  .floor-map {
+    height: 330px;
+    margin: 10px;
+  }
+  .room {
+    font-size: 8px;
+  }
+  .map-legend {
+    padding: 0 13px 14px;
+    gap: 10px;
+  }
+  .floor-switch {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .floor-switch button {
+    flex: 1;
+    padding: 8px 5px;
+  }
+  .role-banner {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .role-banner>div:nth-child(2) {
+    min-width: calc(100% - 65px);
+  }
+  .role-banner select {
+    width: 100%;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .footer {
+    padding: 13px;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .event-row {
+    gap: 8px;
+  }
+  .event-row time {
+    display: none;
+  }
+  .notification-list .badge {
+    display: none;
+  }
+  .load-name {
+    width: 105px;
+  }
+  .load-row .badge {
+    display: none;
+  }
+  .detail-stats {
+    gap: 8px;
+  }
+  .detail-stats strong {
+    font-size: 16px;
+  }
+  .login-form-wrap {
+    padding: 28px 22px;
+  }
+  .login-brand {
+    margin-bottom: 45px;
+  }
+  .top-actions {
+    gap: 8px;
+  }
+}

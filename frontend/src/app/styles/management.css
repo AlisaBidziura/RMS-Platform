@@ -1,0 +1,158 @@
+.integration-grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 15px;
+  margin-bottom: 18px;
+}
+
+.integration-card {
+  padding: 19px;
+}
+
+.integration-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.integration-card h3 {
+  font: 700 13px Manrope;
+  color: #2e3b50;
+  margin: 17px 0 7px;
+}
+
+.integration-card>p {
+  font-size: 10px;
+  line-height: 1.6;
+  color: #8b97a8;
+  min-height: 32px;
+  margin: 0;
+}
+
+.integration-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  margin-top: 17px;
+  padding-top: 14px;
+}
+
+.integration-bottom>span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #929dad;
+  font-size: 9px;
+}
+
+.notice-panel {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 18px;
+  background: #f1f5ff;
+  border: 1px solid #e0e8ff;
+  border-radius: 10px;
+  color: #5270d8;
+}
+
+.notice-panel b {
+  font-size: 11px;
+  color: #354b91;
+}
+
+.notice-panel p {
+  font-size: 10px;
+  color: #7383a5;
+  line-height: 1.6;
+  margin: 5px 0 0;
+}
+
+.notice-panel.compact {
+  margin-top: 18px;
+  padding: 12px;
+}
+
+.infrastructure-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 17px;
+}
+
+.infra-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.infra-main h3 {
+  font-size: 12px;
+  margin: 0 0 5px;
+  color: #344056;
+}
+
+.infra-main p {
+  font-size: 10px;
+  color: #919cad;
+  margin: 0 0 9px;
+}
+
+.role-banner {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 18px;
+  padding: 18px;
+}
+
+.role-banner-icon {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: #edf2ff;
+  color: #5271dc;
+  flex: none;
+}
+
+.role-banner>div:nth-child(2) {
+  flex: 1;
+}
+
+.role-banner h3 {
+  font: 700 12px Manrope;
+  margin: 0 0 6px;
+  color: #344056;
+}
+
+.role-banner p {
+  font-size: 10px;
+  color: #8b97a7;
+  margin: 0;
+}
+
+.role-banner select {
+  width: auto;
+  min-width: 155px;
+}
+
+.employee-cell {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.notification-list {
+  padding: 0 4px;
+}
+
+.notification-list .event-row {
+  padding: 16px 4px;
+}
+
+.notification-list .badge {
+  margin-left: 8px;
+}
