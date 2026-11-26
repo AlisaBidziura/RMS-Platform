@@ -3,6 +3,7 @@ import random
 import re
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from fastapi import (
     FastAPI,
@@ -84,16 +85,17 @@ async def get_db():
 
 
 
+security = HTTPBearer()
+
 async def require_auth(
-    authorization: str | None = Header(default=None),
+    credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
-    if authorization != f"Bearer {FAKE_TOKEN}":
+    if credentials.credentials != FAKE_TOKEN:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Unauthorized",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
     return True
 
 
@@ -630,11 +632,11 @@ async def get_tasks(
     dependencies=[Depends(require_auth)],
 )
 async def create_task(
-    payload: TaskCreate,
+    task_data: TaskCreate,
     db: AsyncSession = Depends(get_db),
 ):
 
-    robot = await db.get(Robot, payload.robotId)
+    robot = await db.get(Robot, task_data.robotId)
 
     if not robot:
         raise HTTPException(
@@ -648,11 +650,14 @@ async def create_task(
             detail="Робот сейчас недоступен для новой задачи",
         )
 
-    # Prevent assigning multiple active tasks to one robot.
     existing_task = await db.scalar(
         select(Task).where(
             Task.robot_id == robot.id,
-            Task.status.in_(["Ожидает", "В работе", "Требует внимания"]),
+            Task.status.in_([
+                "Ожидает",
+                "В работе",
+                "Требует внимания",
+            ]),
         )
     )
 
@@ -662,7 +667,6 @@ async def create_task(
             detail="У робота уже есть активная задача",
         )
 
-    # Generate IDs: T-108, T-109, T-110...
     existing_ids = (
         await db.scalars(select(Task.id))
     ).all()
@@ -677,12 +681,12 @@ async def create_task(
 
     task = Task(
         id=f"T-{next_number}",
-        title=payload.title,
-        kind=payload.kind,
-        robot_id=payload.robotId,
-        zone=payload.zone,
+        title=task_data.title,
+        kind=task_data.kind,
+        robot_id=task_data.robotId,
+        zone=task_data.zone,
         status="Ожидает",
-        priority="Обычный",
+        priority=task_data.priority,
         time=format_time(),
         created_at=current_time(),
         started_at=None,
@@ -727,15 +731,26 @@ async def update_task(
             detail="Задача не найдена",
         )
 
+    # исправление ошибки статусов:
+    if task.status in {"Завершена", "Отменена"}:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Нельзя изменить статус завершенной "
+                "или отмененной задачи"
+            ),
+        )
+
     old_status = task.status
     new_status = payload.status
 
     if old_status == new_status:
         return task_to_dict(task)
 
+    robot = await db.get(Robot, task.robot_id)
+    
     task.status = new_status
 
-    robot = await db.get(Robot, task.robot_id)
 
     if robot:
 
@@ -808,10 +823,8 @@ async def reset_system(
     db: AsyncSession = Depends(get_db),
 ):
 
-    # Remove all tasks.
     await db.execute(delete(Task))
 
-    # Reset every robot.
     robots = (
         await db.scalars(select(Robot))
     ).all()

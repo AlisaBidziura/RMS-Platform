@@ -1,5 +1,12 @@
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Annotated, Literal
 
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+)
 
 class LoginRequest(BaseModel):
     login: str = Field(min_length=1)
@@ -32,12 +39,45 @@ class RobotResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+NonEmptyString = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=255,
+    ),
+]
+
 
 class TaskCreate(BaseModel):
-    title: str = Field(min_length=1, max_length=255)
-    kind: str = Field(min_length=1, max_length=100)
-    robotId: str = Field(min_length=1)
-    zone: str = Field(min_length=1, max_length=255)
+    title: NonEmptyString
+    kind: Annotated[
+        str,
+        StringConstraints(
+            strip_whitespace=True,
+            min_length=1,
+            max_length=100,
+        ),
+    ]
+    robotId: Annotated[
+        str,
+        StringConstraints(
+            strip_whitespace=True,
+            min_length=1,
+        ),
+    ]
+    zone: NonEmptyString
+
+    priority: Literal["Обычный", "Высокий"] = "Обычный"
+
+    @field_validator("priority")
+    @classmethod
+    def validate_priority(cls, value: str) -> str:
+        if value not in ("Обычный", "Высокий"):
+            raise ValueError(
+                "Приоритет должен быть 'Обычный' или 'Высокий'"
+            )
+        return value
 
 
 class TaskStatusUpdate(BaseModel):
